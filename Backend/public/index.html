@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VietFuture — Xác minh tài liệu Blockchain</title>
+  <meta name="description" content="Xác minh tài liệu trên blockchain. Kiểm tra tính xác thực của tài liệu được chứng thực bởi các tổ chức uy tín." />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+  <!-- Background Effects -->
+  <div class="bg-effects">
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-orb bg-orb-3"></div>
+  </div>
+  <div class="bg-grid"></div>
+
+  <div class="container">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header__logo">
+        <div class="header__icon">⛓️</div>
+        <h1 class="header__title">VietFuture</h1>
+      </div>
+      <p class="header__subtitle">
+        Xác minh tài liệu trên blockchain. Đảm bảo tính xác thực, minh bạch và bất biến.
+      </p>
+    </header>
+
+    <!-- Tab Navigation -->
+    <div class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="panel-verify" role="tab" id="tab-verify">
+        <span class="tab-btn__icon">🔍</span>
+        Xác minh
+      </button>
+      <button class="tab-btn" data-tab="panel-view" role="tab" id="tab-view">
+        <span class="tab-btn__icon">📄</span>
+        Xem tài liệu
+      </button>
+    </div>
+
+    <!-- ===== Panel: Verify ===== -->
+    <div class="panel active" id="panel-verify" role="tabpanel">
+      <div class="card">
+        <h2 class="card__title">Xác minh tài liệu</h2>
+        <p class="card__desc">Upload file để kiểm tra tài liệu đã được chứng thực trên blockchain chưa.</p>
+
+        <!-- Dropzone -->
+        <div class="dropzone" id="dropzone">
+          <div class="dropzone__icon">📁</div>
+          <div class="dropzone__text">
+            <p class="dropzone__title">Kéo thả file vào đây</p>
+            <p class="dropzone__hint">hoặc <span class="dropzone__highlight">click để chọn file</span></p>
+            <p class="dropzone__hint">PDF, JPG, PNG, DOCX, XLS — tối đa 10MB</p>
+          </div>
+          <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.docx,.xls,.xlsx" hidden />
+        </div>
+
+        <!-- File Preview -->
+        <div class="file-preview" id="filePreview">
+          <span class="file-preview__icon" id="filePreviewIcon">📎</span>
+          <div class="file-preview__info">
+            <div class="file-preview__name" id="filePreviewName"></div>
+            <div class="file-preview__size" id="filePreviewSize"></div>
+          </div>
+          <button class="file-preview__remove" id="fileRemoveBtn" title="Xóa file">✕</button>
+        </div>
+
+        <!-- Verify Button -->
+        <button class="btn btn-primary" id="verifyBtn" disabled>
+          <span class="spinner" id="verifySpinner"></span>
+          <span id="verifyBtnText">Xác minh tài liệu</span>
+        </button>
+
+        <!-- Result -->
+        <div class="result" id="verifyResult"></div>
+      </div>
+    </div>
+
+    <!-- ===== Panel: View ===== -->
+    <div class="panel" id="panel-view" role="tabpanel">
+      <div class="card">
+        <h2 class="card__title">Xem nội dung tài liệu</h2>
+        <p class="card__desc">Nhập mã truy cập được cấp bởi tổ chức để xem nội dung tài liệu đã chứng thực.</p>
+
+        <!-- Auth Notice -->
+        <div class="auth-notice">
+          <span class="auth-notice__icon">🔐</span>
+          <span>Bạn cần đăng nhập để xem nội dung. Hệ thống sẽ ghi lại lịch sử xem.</span>
+        </div>
+
+        <!-- Access Code Input -->
+        <div class="input-group">
+          <label class="input-group__label" for="accessCodeInput">Mã truy cập</label>
+          <input
+            type="text"
+            class="input-group__input"
+            id="accessCodeInput"
+            placeholder="Nhập mã truy cập tài liệu..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <p class="input-group__hint">Mã truy cập được tổ chức cấp cho mỗi tài liệu đã chứng thực.</p>
+        </div>
+
+        <!-- View Button -->
+        <button class="btn btn-primary" id="viewBtn">
+          <span class="spinner" id="viewSpinner"></span>
+          <span id="viewBtnText">Xem tài liệu</span>
+        </button>
+
+        <!-- Result -->
+        <div class="result" id="viewResult"></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>VietFuture &copy; 2026 — Blockchain Document Verification</p>
+    </footer>
+
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
