@@ -9,6 +9,8 @@ RUN npm install
 
 COPY . .
 
+RUN chmod +x entrypoint.sh || true
+
 EXPOSE 3000
 
-CMD ["npm", "run", "dev"]
+ENTRYPOINT ["sh", "./entrypoint.sh"]

@@ -11,9 +11,8 @@ const allowedMimeTypes = [
 ];
 
 const fileFilter = (req, file, cb) => {
-    // Kiểm tra xem loại file (mimetype) có nằm trong danh sách VIP ở trên không
     if (allowedMimeTypes.includes(file.mimetype)) {
-        cb(null, true); // Cho qua
+        cb(null, true); 
     } else {
         cb(new Error('Only PDF, JPG, PNG, DOCX, and XLS files are allowed!'), false);
     }
