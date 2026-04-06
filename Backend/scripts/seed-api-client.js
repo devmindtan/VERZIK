@@ -5,7 +5,7 @@
  * Tạo 1 ApiClient với:
  *   - client_id + client_secret (hiện ra console)
  *   - permissions: ['upload']
- *   - whitelisted_wallets: [Account #1, Account #2]
+ *   - whitelisted_domains: domain được phép gọi upload API
  */
 
 require('dotenv').config();
@@ -15,9 +15,9 @@ const crypto = require('crypto');
 const ApiClient = require('../models/ApiClient.model');
 const User = require('../models/User.model');
 
-const TEST_WALLETS = [
-  '0x70997970c51812dc3a010c7d01b50e0d17dc79c8', // Account #1 (Tenant Admin)
-  '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc', // Account #2 (Treasury)
+const TEST_DOMAINS = [
+  'localhost',
+  '127.0.0.1',
 ];
 
 const run = async () => {
@@ -47,7 +47,7 @@ const run = async () => {
   if (existing) {
     console.log('\n⏭️  API client "Test Upload Client" already exists:');
     console.log(`   client_id: ${existing.client_id}`);
-    console.log(`   whitelisted_wallets: ${existing.whitelisted_wallets.join(', ')}`);
+    console.log(`   whitelisted_domains: ${(existing.whitelisted_domains || []).join(', ')}`);
     console.log('   ⚠️  Nếu muốn tạo lại, xóa record cũ trong MongoDB trước.');
     await mongoose.disconnect();
     return;
@@ -65,7 +65,7 @@ const run = async () => {
     name: 'Test Upload Client',
     is_active: true,
     permissions: ['upload'],
-    whitelisted_wallets: TEST_WALLETS,
+    whitelisted_domains: TEST_DOMAINS,
   });
 
   console.log('\n✅ API Client created successfully!');
@@ -73,7 +73,7 @@ const run = async () => {
   console.log(`   client_id:     ${clientId}`);
   console.log(`   client_secret: ${clientSecret}`);
   console.log(`   permissions:   ${apiClient.permissions.join(', ')}`);
-  console.log(`   wallets:       ${TEST_WALLETS.join(', ')}`);
+  console.log(`   domains:       ${TEST_DOMAINS.join(', ')}`);
   console.log('══════════════════════════════════════════');
   console.log('\n⚠️  LƯU LẠI client_secret — không thể xem lại sau khi seed!');
 

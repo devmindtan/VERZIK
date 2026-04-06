@@ -2,9 +2,18 @@ const { ethers } = require('ethers');
 require('dotenv').config();
 
 const VOUCHER_PROTOCOL_ABI = [
-  'function registerWithSignature((bytes32 tenantId, bytes32 fileHash, string cid, bytes32 ciphertextHash, bytes32 encryptionMetaHash, uint8 docType, uint16 version, uint256 nonce, uint256 deadline) payload, bytes signature) external',
+  'function registerWithSignature((bytes32 tenantId, bytes32 fileHash, string cid, bytes32 ciphertextHash, bytes32 encryptionMetaHash, uint32 docType, uint32 version, uint256 nonce, uint256 deadline) payload, bytes signature) external',
   'function nonces(bytes32 tenantId, address operator) external view returns (uint256)',
   'function verify(bytes32 tenantId, bytes32 fileHash) external view returns (bool exists, bool isValid, address issuer, string cid)',
+
+  // Custom errors (decode revert rõ ràng thay vì "missing revert data")
+  'error TenantNotFound()',
+  'error TenantInactive()',
+  'error OperatorNotInTenant()',
+  'error OperatorNotActive()',
+  'error InvalidSignature()',
+  'error ExpiredSignature()',
+  'error DocumentAlreadyExists()',
 ];
 
 const provider = new ethers.JsonRpcProvider(

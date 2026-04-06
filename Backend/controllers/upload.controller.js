@@ -1,208 +1,485 @@
 const { ethers } = require('ethers');
 const EncryptedDocument = require('../models/EncryptedDocument.model');
 const minioService = require('../services/minio.service');
+const ipfsService = require('../services/ipfs.service');
 const blockchainService = require('../services/blockchain.service');
 const activityService = require('../services/activity.service');
 
-/**
- * POST /api/v1/upload-binary
- * Headers: X-Document-Hash, X-Metadata (JSON), X-Anchor-Payload (optional JSON)
- * Body: raw binary (application/octet-stream)
- *
- * Flow: 3-layer auth (middleware) → validate → MinIO → MongoDB → anchor on-chain (nếu có)
- */
-const uploadBinary = async (req, res) => {
+const parseJsonField = (value, fieldName, { required = false } = {}) => {
+  if (value === undefined || value === null || value === '') {
+    if (required) {
+      throw new Error(`${fieldName} is required`);
+    }
+    return null;
+  }
+
+  if (typeof value === 'object') {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    throw new Error(`${fieldName} must be JSON string`);
+  }
+
   try {
-    // ─── Parse headers ───
-    const documentHash = req.headers['x-document-hash'];
-    const metadataRaw = req.headers['x-metadata'];
+    return JSON.parse(value);
+  } catch {
+    throw new Error(`${fieldName} must be valid JSON`);
+  }
+};
 
-    if (!documentHash) {
-      return res.status(400).json({ error: 'Missing X-Document-Hash header' });
+/**
+ * API 1: POST /api/v1/upload
+ * multipart/form-data:
+ * - encrypted_file: binary file
+ * - original_hash: bytes32 hash
+ * - hashes: JSON string
+ * - keys: JSON string
+ * - anchor_payload: JSON string (optional)
+ */
+const uploadDraft = async (req, res) => {
+  try {
+    if (!req.file || !req.file.buffer || req.file.size === 0) {
+      return res.status(400).json({ error: 'Missing encrypted_file in multipart form-data' });
     }
 
-    if (!metadataRaw) {
-      return res.status(400).json({ error: 'Missing X-Metadata header' });
+    const originalHash = req.body.original_hash || req.body.document_hash;
+    if (!originalHash) {
+      return res.status(400).json({ error: 'Missing original_hash' });
     }
 
-    let metadata;
+    let hashes;
+    let keys;
+    let anchorPayload;
     try {
-      metadata = JSON.parse(metadataRaw);
-    } catch {
-      return res.status(400).json({ error: 'X-Metadata must be valid JSON' });
+      hashes = parseJsonField(req.body.hashes, 'hashes') || {};
+      keys = parseJsonField(req.body.keys, 'keys') || {};
+      anchorPayload = parseJsonField(req.body.anchor_payload, 'anchor_payload') || {};
+    } catch (parseError) {
+      return res.status(400).json({ error: parseError.message });
     }
 
-    const { encrypted_key, nonce } = metadata;
-    if (!encrypted_key || !nonce) {
-      return res.status(400).json({ error: 'X-Metadata must contain encrypted_key and nonce' });
+    hashes = {
+      ciphertext_hash: hashes.ciphertext_hash || req.body.ciphertext_hash || null,
+      encryption_meta_hash: hashes.encryption_meta_hash || req.body.encryption_meta_hash || null,
+    };
+
+    if (!hashes.ciphertext_hash) {
+      return res.status(400).json({ error: 'hashes.ciphertext_hash is required' });
+    }
+    keys = {
+      encrypted_key: keys.encrypted_key || req.body.encrypted_key || null,
+      issuer_encrypted_key: keys.issuer_encrypted_key || req.body.issuer_encrypted_key || null,
+      recipient_keys: keys.recipient_keys || {},
+      nonce: keys.nonce || req.body.nonce || null,
+    };
+
+    if (!keys.encrypted_key || !keys.issuer_encrypted_key) {
+      return res.status(400).json({ error: 'keys.encrypted_key and keys.issuer_encrypted_key are required' });
     }
 
-    // ─── Binary data ───
-    const encryptedData = req.body;
-    if (!encryptedData || encryptedData.length === 0) {
-      return res.status(400).json({ error: 'Empty request body — expected binary data' });
-    }
-
-    // ─── Duplicate check ───
-    const existing = await EncryptedDocument.findOne({ document_hash: documentHash });
+    const existing = await EncryptedDocument.findOne({ original_hash: originalHash });
     if (existing) {
       return res.status(409).json({
-        error: 'Document already uploaded',
-        document_hash: documentHash,
+        error: 'Document already exists',
+        original_hash: originalHash,
         status: existing.status,
       });
     }
 
-    // ─── Tính ciphertext_hash trên server ───
-    const ciphertextHash = ethers.keccak256(encryptedData);
+    const encryptedData = req.file.buffer;
+    const fileName = req.file.originalname || `${originalHash}.bin`;
 
-    // ─── Upload lên MinIO ───
-    const objectKey = documentHash;
-    await minioService.uploadFile(objectKey, encryptedData, 'application/octet-stream');
+    // 1) Add đơn lẻ /api/v0/add
+    const singleFileAdd = await ipfsService.addSingle(
+      encryptedData,
+      fileName,
+      'application/octet-stream'
+    );
+    const fileCID = singleFileAdd.cid;
 
-    // ─── Lưu metadata vào MongoDB ───
-    const doc = await EncryptedDocument.create({
-      document_hash: documentHash,
-      ciphertext_hash: ciphertextHash,
-      encryption_meta_hash: metadata.encryption_meta_hash || null,
-      encrypted_key: encrypted_key,
-      nonce: nonce,
-      file_size: encryptedData.length,
-      minio_object_key: objectKey,
-      uploader_wallet: req.walletAddress || null,
-      api_client: req.apiClient?._id || null,
+    // 2) Tạo metadata JSON + upload metadata lên IPFS
+    const metadataPayload = {
+      file_pointer: `ipfs://${fileCID}`,
+      file_cid: fileCID,
+      original_hash: originalHash,
+      issuer_address: req.walletAddress,
+      hashes: {
+        ciphertext_hash: hashes.ciphertext_hash,
+        encryption_meta_hash: hashes.encryption_meta_hash || null,
+      },
+      keys: {
+        encrypted_key: keys.encrypted_key,
+        issuer_encrypted_key: keys.issuer_encrypted_key,
+        recipient_keys: keys.recipient_keys,
+        nonce: keys.nonce,
+      },
+      file_name: fileName,
+      uploaded_at: new Date().toISOString(),
+    };
+
+    // 2) Add file + metadata /api/v0/add?wrap-with-directory=true
+    const metadataFileName = `${originalHash}.metadata.json`;
+    const metadataBuffer = Buffer.from(JSON.stringify(metadataPayload), 'utf8');
+    const wrappedAdd = await ipfsService.addWithMetadataDirectory({
+      fileData: encryptedData,
+      fileName,
+      metadataData: metadataBuffer,
+      metadataFileName,
+      directoryName: originalHash,
     });
-
-    // ─── On-chain anchoring (nếu client gửi anchor payload) ───
-    let anchorResult = null;
-    const anchorRaw = req.headers['x-anchor-payload'];
-    if (anchorRaw) {
-      try {
-        const anchorPayload = JSON.parse(anchorRaw);
-        const { tenant_id, doc_type, version, operator_nonce, deadline, signature } = anchorPayload;
-
-        if (!tenant_id || !signature) {
-          return res.status(400).json({ error: 'X-Anchor-Payload requires tenant_id and signature' });
-        }
-
-        anchorResult = await blockchainService.anchorDocument(
-          {
-            tenantId: tenant_id,
-            fileHash: documentHash,
-            cid: objectKey,
-            ciphertextHash: ciphertextHash,
-            encryptionMetaHash: metadata.encryption_meta_hash || ethers.ZeroHash,
-            docType: doc_type || 0,
-            version: version || 1,
-            nonce: operator_nonce,
-            deadline: deadline,
-          },
-          signature
-        );
-
-        doc.status = 'anchored';
-        doc.tenant_id = tenant_id;
-        doc.tx_hash = anchorResult.txHash;
-        await doc.save();
-      } catch (anchorError) {
-        console.error('On-chain anchor failed:', anchorError.message);
-        doc.status = 'failed';
-        await doc.save();
-
-        // Không fail toàn bộ request — file đã lưu MinIO thành công
-        anchorResult = { error: anchorError.message };
-      }
+    if (wrappedAdd.fileCid && wrappedAdd.fileCid !== fileCID) {
+      console.warn(`IPFS file CID mismatch: single=${fileCID}, wrapped=${wrappedAdd.fileCid}`);
     }
 
-    // ─── Activity log ───
+    let metadataCID = wrappedAdd.metadataCid;
+    if (!metadataCID) {
+      const fallbackMetadataAdd = await ipfsService.addSingle(
+        metadataBuffer,
+        metadataFileName,
+        'application/json'
+      );
+      metadataCID = fallbackMetadataAdd.cid;
+    }
+
+    // 3) Pin CIDs /api/v0/pin/add?arg=
+    await ipfsService.pin(fileCID);
+    await ipfsService.pin(metadataCID);
+    if (wrappedAdd.directoryCid) {
+      await ipfsService.pin(wrappedAdd.directoryCid);
+    }
+
+    // 3) Cache binary về MinIO để serve nhanh
+    const objectKey = `documents/${originalHash}.bin`;
+    await minioService.uploadFile(objectKey, encryptedData, 'application/octet-stream');
+
+    // 4) Lưu DB dạng PENDING (lazy minting)
+    const doc = await EncryptedDocument.create({
+      file_name: fileName,
+      original_hash: originalHash,
+      issuer_address: req.walletAddress,
+      file_cid: fileCID,
+      metadata_cid: metadataCID,
+      directory_cid: wrappedAdd.directoryCid || null,
+      hashes: {
+        ciphertext_hash: hashes.ciphertext_hash,
+        encryption_meta_hash: hashes.encryption_meta_hash || null,
+      },
+      keys: {
+        encrypted_key: keys.encrypted_key,
+        issuer_encrypted_key: keys.issuer_encrypted_key,
+        recipient_keys: keys.recipient_keys,
+        nonce: keys.nonce,
+      },
+      file_size: req.file.size,
+      minio_object_key: objectKey,
+      tenant_id: anchorPayload.tenant_id || null,
+      doc_type: anchorPayload.doc_type ?? 0,
+      version: anchorPayload.version ?? 1,
+      operator_nonce: anchorPayload.operator_nonce ?? null,
+      deadline: anchorPayload.deadline ?? null,
+      api_client: req.apiClient?._id || null,
+      status: 'PENDING',
+    });
+
     activityService.log({
-      action: 'upload_encrypted',
+      action: 'upload_draft',
       userId: null,
       resourceType: 'encrypted_document',
-      resourceId: documentHash,
+      resourceId: originalHash,
       metadata: {
-        file_size: encryptedData.length,
-        ciphertext_hash: ciphertextHash,
+        file_name: fileName,
+        file_size: req.file.size,
+        file_cid: fileCID,
+        metadata_cid: metadataCID,
+        directory_cid: wrappedAdd.directoryCid || null,
         wallet: req.walletAddress,
         client_id: req.apiClient?.client_id,
-        anchored: doc.status === 'anchored',
       },
     }, req);
 
     return res.status(201).json({
       status: 'success',
-      document_hash: documentHash,
-      ciphertext_hash: ciphertextHash,
-      file_size: encryptedData.length,
-      anchor: anchorResult
-        ? {
-            status: doc.status,
-            tx_hash: anchorResult.txHash || null,
-            error: anchorResult.error || null,
-          }
-        : { status: 'pending', message: 'No anchor payload provided — document saved as pending' },
+      document: {
+        file_name: doc.file_name,
+        original_hash: doc.original_hash,
+        cid: doc.metadata_cid,
+        metadata_cid: doc.metadata_cid,
+        file_cid: doc.file_cid,
+        directory_cid: doc.directory_cid,
+        nonce: doc.operator_nonce,
+        draft_status: doc.status,
+        created_at: doc.createdAt,
+      },
     });
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('Upload draft error:', error);
     return res.status(500).json({ error: 'Upload failed' });
   }
 };
 
 /**
- * GET /api/v1/document/:hash/binary
- * Stream encrypted binary từ MinIO
+ * API 2: GET /api/v1/documents/pending
+ * Lấy các tài liệu PENDING của issuer hiện tại.
+ */
+const getPendingDocuments = async (req, res) => {
+  try {
+    const docs = await EncryptedDocument.find({
+      issuer_address: req.walletAddress,
+      status: 'PENDING',
+    }).sort({ createdAt: -1 });
+
+    const pending = docs.map((doc) => ({
+      file_name: doc.file_name,
+      upload_date: doc.createdAt,
+      original_hash: doc.original_hash,
+      cid: doc.metadata_cid,
+      metadata_cid: doc.metadata_cid,
+      file_cid: doc.file_cid,
+      directory_cid: doc.directory_cid,
+      nonce: doc.operator_nonce,
+      encryption_nonce: doc.keys?.nonce || null,
+      tenant_id: doc.tenant_id,
+      status: doc.status,
+    }));
+
+    return res.json({
+      status: 'success',
+      total: pending.length,
+      documents: pending,
+    });
+  } catch (error) {
+    console.error('Get pending documents error:', error);
+    return res.status(500).json({ error: 'Failed to load pending documents' });
+  }
+};
+
+/**
+ * API 3: POST /api/v1/anchor
+ * Body JSON: { original_hash, signature, nonce?, deadline?, tenant_id?, doc_type?, version?, cid?, ciphertext_hash?, encryption_meta_hash? }
+ * - signature: chữ ký ủy quyền từ UI/user (bắt buộc).
+ * - Backend luôn tự ký on-chain bằng BACKEND_OPERATOR_PRIVATE_KEY để trả gas.
+ */
+const anchorDocument = async (req, res) => {
+  try {
+    const {
+      original_hash: originalHash,
+      signature,
+      nonce: overrideNonce,
+      deadline: overrideDeadline,
+      tenant_id: overrideTenantId,
+      doc_type: overrideDocType,
+      version: overrideVersion,
+      cid: overrideCid,
+      ciphertext_hash: overrideCiphertextHash,
+      encryption_meta_hash: overrideEncryptionMetaHash,
+    } = req.body || {};
+    if (!originalHash || !signature) {
+      return res.status(400).json({ error: 'original_hash and signature are required' });
+    }
+
+    const issuerCandidates = [...new Set([
+      (req.walletAddress || '').toLowerCase(),
+      req.apiClient?.client_id ? `client:${req.apiClient.client_id}`.toLowerCase() : null,
+    ].filter(Boolean))];
+
+    const doc = await EncryptedDocument.findOne({
+      original_hash: originalHash,
+      issuer_address: { $in: issuerCandidates },
+    });
+    if (!doc) {
+      return res.status(404).json({ error: 'Draft document not found' });
+    }
+
+    if (doc.status === 'ANCHORED') {
+      return res.status(409).json({
+        error: 'Document already anchored',
+        original_hash: originalHash,
+        tx_hash: doc.tx_hash,
+      });
+    }
+
+    const tenantId = overrideTenantId || doc.tenant_id;
+    const docType = Number(overrideDocType ?? doc.doc_type ?? 0);
+    const version = Number(overrideVersion ?? doc.version ?? 1);
+    const nonce = overrideNonce ?? doc.operator_nonce;
+    const deadline = overrideDeadline ?? doc.deadline;
+    const cid = overrideCid || doc.metadata_cid;
+    const ciphertextHash = overrideCiphertextHash || doc.hashes?.ciphertext_hash || ethers.ZeroHash;
+    const encryptionMetaHash = overrideEncryptionMetaHash || doc.hashes?.encryption_meta_hash || ethers.ZeroHash;
+
+    if (!tenantId || nonce === null || nonce === undefined || deadline === null || deadline === undefined) {
+      return res.status(400).json({
+        error: 'Draft/request is missing tenant_id/operator_nonce/deadline for blockchain anchoring',
+      });
+    }
+
+    const expectedUserSigner = req.headers['x-wallet-address'];
+    const userAuthorizationPayload = {
+      tenantId,
+      fileHash: doc.original_hash,
+      cid,
+      ciphertextHash,
+      encryptionMetaHash,
+      docType,
+      version,
+      nonce: String(nonce),
+      deadline: String(deadline),
+    };
+    const authorizedSigner = await blockchainService.verifyClientAuthorizationSignature(
+      userAuthorizationPayload,
+      signature,
+      expectedUserSigner
+    );
+
+    const cidsToPin = [...new Set([
+      doc.file_cid,
+      cid,
+      doc.metadata_cid,
+      doc.directory_cid,
+    ].filter(Boolean))];
+
+    const pinResultsByCid = {};
+    for (const pinCid of cidsToPin) {
+      pinResultsByCid[pinCid] = await ipfsService.pinOnAllNodes(pinCid, { strict: true });
+    }
+
+    const anchorResult = await blockchainService.anchorDocument(
+      {
+        tenantId,
+        fileHash: doc.original_hash,
+        cid,
+        ciphertextHash,
+        encryptionMetaHash,
+        docType,
+        version,
+        nonce: String(nonce),
+        deadline: String(deadline),
+      },
+      null
+    );
+
+    doc.tenant_id = tenantId;
+    doc.doc_type = docType;
+    doc.version = version;
+    doc.operator_nonce = String(anchorResult.usedNonce || nonce);
+    doc.deadline = String(deadline);
+    doc.metadata_cid = cid;
+    doc.hashes = {
+      ...(doc.hashes || {}),
+      ciphertext_hash: ciphertextHash,
+      encryption_meta_hash: encryptionMetaHash,
+    };
+    doc.status = 'ANCHORED';
+    doc.tx_hash = anchorResult.txHash;
+    doc.anchor_error = null;
+    doc.anchored_at = new Date();
+    await doc.save();
+
+    activityService.log({
+      action: 'anchor_document',
+      userId: null,
+      resourceType: 'encrypted_document',
+      resourceId: originalHash,
+      metadata: {
+        tx_hash: anchorResult.txHash,
+        metadata_cid: doc.metadata_cid,
+        pin_report: pinResultsByCid,
+        wallet: req.walletAddress,
+        authorized_signer: authorizedSigner,
+        onchain_signature_source: anchorResult.signatureSource,
+        onchain_operator: anchorResult.operatorAddress,
+      },
+    }, req);
+
+    return res.json({
+      status: 'success',
+      document: {
+        original_hash: doc.original_hash,
+        cid: doc.metadata_cid,
+        metadata_cid: doc.metadata_cid,
+        directory_cid: doc.directory_cid,
+        draft_status: doc.status,
+        tx_hash: doc.tx_hash,
+        anchored_at: doc.anchored_at,
+        pin_report: pinResultsByCid,
+      },
+    });
+  } catch (error) {
+    console.error('Anchor document error:', error);
+
+    if (req.body?.original_hash) {
+      await EncryptedDocument.updateOne(
+        {
+          original_hash: req.body.original_hash,
+          issuer_address: {
+            $in: [...new Set([
+              (req.walletAddress || '').toLowerCase(),
+              req.apiClient?.client_id ? `client:${req.apiClient.client_id}`.toLowerCase() : null,
+            ].filter(Boolean))],
+          },
+        },
+        { $set: { status: 'FAILED', anchor_error: error.message } }
+      );
+    }
+
+    return res.status(500).json({ error: 'Anchoring failed', detail: error.message });
+  }
+};
+
+/**
+ * Utility endpoint: stream encrypted file từ MinIO cache.
  */
 const serveBinary = async (req, res) => {
   try {
     const { hash } = req.params;
 
-    const doc = await EncryptedDocument.findOne({ document_hash: hash });
+    const doc = await EncryptedDocument.findOne({ original_hash: hash });
     if (!doc) {
       return res.status(404).json({ error: 'Document not found' });
     }
 
-    // Set response headers
     res.set({
       'Content-Type': 'application/octet-stream',
       'Content-Length': doc.file_size,
-      'X-Document-Hash': doc.document_hash,
-      'X-Metadata': JSON.stringify({
-        encrypted_key: doc.encrypted_key,
-        nonce: doc.nonce,
-      }),
-      'X-Ciphertext-Hash': doc.ciphertext_hash,
+      'X-Original-Hash': doc.original_hash,
+      'X-IPFS-File-CID': doc.file_cid,
+      'X-IPFS-Metadata-CID': doc.metadata_cid,
+      'X-IPFS-Directory-CID': doc.directory_cid || '',
     });
 
-    // Stream từ MinIO
     const stream = await minioService.getObjectStream(doc.minio_object_key);
     stream.pipe(res);
   } catch (error) {
     console.error('Serve binary error:', error);
-    return res.status(500).json({ error: 'Failed to retrieve document' });
+    return res.status(500).json({ error: 'Failed to retrieve binary' });
   }
 };
 
 /**
- * GET /api/v1/document/:hash/status
- * Trả trạng thái document (pending/anchored/failed)
+ * Utility endpoint: trạng thái tài liệu theo original_hash.
  */
 const getDocumentStatus = async (req, res) => {
   try {
     const { hash } = req.params;
 
-    const doc = await EncryptedDocument.findOne({ document_hash: hash });
+    const doc = await EncryptedDocument.findOne({ original_hash: hash });
     if (!doc) {
       return res.status(404).json({ error: 'Document not found' });
     }
 
     return res.json({
-      document_hash: doc.document_hash,
+      original_hash: doc.original_hash,
+      file_name: doc.file_name,
       status: doc.status,
-      ciphertext_hash: doc.ciphertext_hash,
-      file_size: doc.file_size,
+      cid: doc.metadata_cid,
+      file_cid: doc.file_cid,
+      metadata_cid: doc.metadata_cid,
+      directory_cid: doc.directory_cid,
       tx_hash: doc.tx_hash,
       tenant_id: doc.tenant_id,
       created_at: doc.createdAt,
+      anchored_at: doc.anchored_at,
     });
   } catch (error) {
     console.error('Status error:', error);
@@ -210,11 +487,6 @@ const getDocumentStatus = async (req, res) => {
   }
 };
 
-/**
- * GET /api/v1/operator/nonce
- * Query params: tenant_id, operator_address
- * Lấy nonce hiện tại của operator từ smart contract
- */
 const getOperatorNonce = async (req, res) => {
   try {
     const { tenant_id, operator_address } = req.query;
@@ -232,7 +504,9 @@ const getOperatorNonce = async (req, res) => {
 };
 
 module.exports = {
-  uploadBinary,
+  uploadDraft,
+  getPendingDocuments,
+  anchorDocument,
   serveBinary,
   getDocumentStatus,
   getOperatorNonce,

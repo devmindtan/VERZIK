@@ -1,6 +1,8 @@
 const hashService = require('../services/hash.service');
 const minioService = require('../services/minio.service');
 const DocumentRecord = require('../models/DocumentRecord.model');
+const EncryptedDocument = require('../models/EncryptedDocument.model');
+const blockchainService = require('../services/blockchain.service');
 const Identity = require('../models/Identity.model');
 const viewlogService = require('../services/viewlog.service');
 const activityService = require('../services/activity.service');
@@ -37,13 +39,30 @@ const verifyDocument = async (req, res) => {
 
     const fileBuffer = req.file.buffer;
     const hash = hashService.hashDocument(fileBuffer);
-
-    const record = await DocumentRecord.findOne({
+    const encryptedDoc = await EncryptedDocument.findOne({
+      original_hash: hash,
+      status: 'ANCHORED',
+    });
+    const legacyRecord = await DocumentRecord.findOne({
       document_hash: hash,
       is_active: true,
     });
 
-    const result = record ? 'verified' : 'not_verified';
+    let onChain = null;
+    if (encryptedDoc?.tenant_id) {
+      try {
+        onChain = await blockchainService.verifyOnChain(encryptedDoc.tenant_id, hash);
+      } catch (verifyErr) {
+        console.warn('Verify on-chain check warning:', verifyErr.message || verifyErr);
+      }
+    }
+
+    const isVerifiedByOnChain = Boolean(onChain?.exists && onChain?.isValid);
+    const isVerifiedByAnchoredDb = Boolean(encryptedDoc);
+    const isVerifiedByLegacyDb = Boolean(legacyRecord);
+    const result = (isVerifiedByOnChain || isVerifiedByAnchoredDb || isVerifiedByLegacyDb)
+      ? 'verified'
+      : 'not_verified';
 
     // Activity log cho báo cáo/biểu đồ (không cần tamper-proof)
     activityService.log({
@@ -56,18 +75,40 @@ const verifyDocument = async (req, res) => {
         file_size: req.file.size,
         file_type: req.file.mimetype,
         result: result,
-        organization: record?.organization_name || null,
+        organization: legacyRecord?.organization_name || null,
+        tenant_id: encryptedDoc?.tenant_id || null,
+        tx_hash: encryptedDoc?.tx_hash || null,
+        verify_source: isVerifiedByOnChain
+          ? 'onchain'
+          : (isVerifiedByAnchoredDb ? 'anchored_db' : (isVerifiedByLegacyDb ? 'legacy_db' : null)),
       },
     }, req);
 
-    if (record) {
+    if (isVerifiedByOnChain || isVerifiedByAnchoredDb || isVerifiedByLegacyDb) {
+      const organization = legacyRecord?.organization_name || 'VoucherProtocol';
+      const verifiedAt = encryptedDoc?.anchored_at || legacyRecord?.createdAt || null;
       return res.json({
         status: 'verified',
-        message: `Tài liệu này được xác minh bởi ${record.organization_name}`,
+        message: `Tài liệu này được xác minh bởi ${organization}`,
         documentHash: hash,
-        organization: record.organization_name,
-        verifiedAt: record.createdAt,
+        organization,
+        verifiedAt,
         fileName: req.file.originalname,
+        source: isVerifiedByOnChain
+          ? 'onchain'
+          : (isVerifiedByAnchoredDb ? 'anchored_db' : 'legacy_db'),
+        onChain: onChain ? {
+          exists: !!onChain.exists,
+          isValid: !!onChain.isValid,
+          issuer: onChain.issuer,
+          cid: onChain.cid,
+        } : null,
+        anchor: encryptedDoc ? {
+          tenant_id: encryptedDoc.tenant_id,
+          tx_hash: encryptedDoc.tx_hash,
+          metadata_cid: encryptedDoc.metadata_cid,
+          anchored_at: encryptedDoc.anchored_at,
+        } : null,
       });
     }
 
