@@ -24,6 +24,31 @@ const EncryptedDocument = require('../models/EncryptedDocument.model');
 
 const ALL_MODELS = [User, Identity, Wallet, ViewLog, ApiClient, BillingPlan, BillingAccount, DocumentRecord, UserConsent, ActivityLog, EncryptedDocument];
 
+const cleanupLegacyIndexes = async () => {
+  const db = mongoose.connection.db;
+  const collectionName = EncryptedDocument.collection.collectionName;
+  const collection = db.collection(collectionName);
+
+  let indexes = [];
+  try {
+    indexes = await collection.indexes();
+  } catch (err) {
+    console.warn(`  ⚠️  Skip legacy index cleanup for ${collectionName}: ${err.message}`);
+    return;
+  }
+
+  const legacyIndexes = [
+    'document_hash_1', // schema cũ: unique document_hash
+  ];
+
+  for (const indexName of legacyIndexes) {
+    if (indexes.some((idx) => idx.name === indexName)) {
+      await collection.dropIndex(indexName);
+      console.log(`  ♻️  Dropped legacy index ${collectionName}.${indexName}`);
+    }
+  }
+};
+
 const runMigrations = async () => {
   const mongoUri = process.env.MONGODB_URI;
 
@@ -36,6 +61,10 @@ const runMigrations = async () => {
     console.log('🔗 Connecting to MongoDB...');
     await mongoose.connect(mongoUri);
     console.log('✅ MongoDB connected');
+
+    // Cleanup index cũ trước khi ensure index mới
+    console.log('\n🧹 Cleaning legacy indexes...');
+    await cleanupLegacyIndexes();
 
     // Ensure tất cả indexes được tạo
     console.log('\n📦 Ensuring collections & indexes...');

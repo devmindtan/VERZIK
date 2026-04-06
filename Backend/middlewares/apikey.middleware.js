@@ -1,21 +1,64 @@
-const bcrypt = require('bcryptjs');
-const { ethers } = require('ethers');
 const ApiClient = require('../models/ApiClient.model');
 
+const normalizeDomain = (value) => {
+  if (!value || typeof value !== 'string') return null;
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return null;
+
+  // Khi nhận origin/referer dạng URL
+  try {
+    const withScheme = trimmed.includes('://') ? trimmed : `http://${trimmed}`;
+    const url = new URL(withScheme);
+    return url.hostname.toLowerCase();
+  } catch {
+    // Fallback: host/domain raw
+    const raw = trimmed.split('/')[0];
+    return raw.split(':')[0].toLowerCase();
+  }
+};
+
+const resolveRequestDomain = (req) => {
+  const candidates = [
+    req.headers['x-client-domain'],
+    req.headers.origin,
+    req.headers.referer,
+  ];
+
+  for (const candidate of candidates) {
+    const domain = normalizeDomain(candidate);
+    if (domain) return domain;
+  }
+
+  return null;
+};
+
+const domainMatchesWhitelist = (domain, whitelist) => {
+  if (!domain || !Array.isArray(whitelist)) return false;
+
+  return whitelist.some((entry) => {
+    const normalized = normalizeDomain(entry);
+    if (!normalized) return false;
+
+    // Hỗ trợ wildcard *.example.com
+    if (normalized.startsWith('*.')) {
+      const suffix = normalized.slice(2);
+      return domain === suffix || domain.endsWith(`.${suffix}`);
+    }
+
+    return domain === normalized;
+  });
+};
+
 /**
- * Middleware xác thực 3 lớp cho upload API:
- * Layer 1: client_id + client_secret
- * Layer 2: wallet address in whitelist
- * Layer 3: ECDSA signature verification
+ * Middleware auth cho upload API:
+ * - Chỉ cần X-Client-Id hợp lệ
+ * - Domain gọi API phải nằm trong whitelist của API client
  */
 const apiKeyAuth = async (req, res, next) => {
   try {
-    // ─── Layer 1: API Credentials ───
     const clientId = req.headers['x-client-id'];
-    const clientSecret = req.headers['x-client-secret'];
-
-    if (!clientId || !clientSecret) {
-      return res.status(401).json({ error: 'Missing API credentials (X-Client-Id, X-Client-Secret)' });
+    if (!clientId) {
+      return res.status(401).json({ error: 'Missing X-Client-Id header' });
     }
 
     const apiClient = await ApiClient.findOne({ client_id: clientId, is_active: true });
@@ -23,65 +66,34 @@ const apiKeyAuth = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid or inactive API client' });
     }
 
-    const secretMatch = await bcrypt.compare(clientSecret, apiClient.client_secret_hash);
-    if (!secretMatch) {
-      return res.status(401).json({ error: 'Invalid API secret' });
-    }
-
     if (!apiClient.permissions.includes('upload')) {
       return res.status(403).json({ error: 'API client does not have upload permission' });
     }
 
-    // ─── Layer 2: Wallet Whitelist ───
-    const walletAddress = req.headers['x-wallet-address'];
-    if (!walletAddress) {
-      return res.status(401).json({ error: 'Missing wallet address (X-Wallet-Address)' });
-    }
-
-    const normalizedWallet = walletAddress.toLowerCase();
-    const whitelist = apiClient.whitelisted_wallets.map(w => w.toLowerCase());
-
-    if (!whitelist.includes(normalizedWallet)) {
-      return res.status(403).json({ error: 'Wallet not in whitelist' });
-    }
-
-    // ─── Layer 3: Signature Verification ───
-    const signature = req.headers['x-signature'];
-    const timestamp = req.headers['x-timestamp'];
-
-    if (!signature || !timestamp) {
-      return res.status(401).json({ error: 'Missing signature or timestamp (X-Signature, X-Timestamp)' });
-    }
-
-    // Timestamp window: 5 minutes
-    const now = Math.floor(Date.now() / 1000);
-    const ts = parseInt(timestamp, 10);
-    if (isNaN(ts) || Math.abs(now - ts) > 300) {
-      return res.status(401).json({ error: 'Timestamp expired or invalid (5 minute window)' });
-    }
-
-    // Message = "VERZIK_UPLOAD:{client_id}:{timestamp}"
-    const message = `VERZIK_UPLOAD:${clientId}:${timestamp}`;
-    let recoveredAddress;
-    try {
-      recoveredAddress = ethers.verifyMessage(message, signature);
-    } catch {
-      return res.status(401).json({ error: 'Invalid signature format' });
-    }
-
-    if (recoveredAddress.toLowerCase() !== normalizedWallet) {
+    const requestDomain = resolveRequestDomain(req);
+    if (!requestDomain) {
       return res.status(401).json({
-        error: 'Signature does not match wallet address',
-        expected: normalizedWallet,
-        recovered: recoveredAddress.toLowerCase(),
+        error: 'Missing caller domain (send X-Client-Domain or Origin header)',
       });
     }
 
-    // ─── Auth passed — attach context ───
-    req.apiClient = apiClient;
-    req.walletAddress = normalizedWallet;
+    const whitelistDomains = (apiClient.whitelisted_domains || []).map(normalizeDomain).filter(Boolean);
+    if (whitelistDomains.length === 0) {
+      return res.status(403).json({ error: 'API client has no whitelisted domains configured' });
+    }
 
-    // Update last_used_at
+    if (!domainMatchesWhitelist(requestDomain, whitelistDomains)) {
+      return res.status(403).json({
+        error: 'Domain not in whitelist',
+        domain: requestDomain,
+      });
+    }
+
+    // Attach context.
+    req.apiClient = apiClient;
+    // Dùng wallet header nếu có; fallback theo client_id để tracking issuer ổn định.
+    req.walletAddress = (req.headers['x-wallet-address'] || `client:${clientId}`).toLowerCase();
+
     apiClient.last_used_at = new Date();
     await apiClient.save();
 

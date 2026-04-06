@@ -24,6 +24,9 @@ const activityLogSchema = new mongoose.Schema(
         'login',            // đăng nhập
         'logout',           // đăng xuất
         'consent',          // ký consent
+        'upload_draft',     // upload tài liệu dạng draft (pending)
+        'anchor_document',  // anchor tài liệu lên blockchain
+        'upload_encrypted', // legacy action cũ
         'push_document',    // tổ chức push tài liệu
         'create_api_client',// tạo API client
         'purchase_credits', // mua credits

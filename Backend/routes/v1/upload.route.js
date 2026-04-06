@@ -1,36 +1,64 @@
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 const { apiKeyAuth } = require('../../middlewares/apikey.middleware');
 const uploadController = require('../../controllers/upload.controller');
 
 /**
- * POST /api/v1/upload-binary
- * Body: raw binary (application/octet-stream)
- * Auth: 3-layer (X-Client-Id, X-Client-Secret, X-Wallet-Address, X-Signature, X-Timestamp)
- * Data: X-Document-Hash, X-Metadata (JSON), X-Anchor-Payload (optional JSON)
+ * Upload middleware cho encrypted binary (multipart/form-data)
+ */
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
+
+/**
+ * API 1: POST /api/v1/upload
+ * multipart/form-data:
+ * - encrypted_file (binary)
+ * - original_hash (string)
+ * - hashes (JSON string)
+ * - keys (JSON string)
+ * - anchor_payload (JSON string, optional)
  */
 router.post(
-  '/upload-binary',
-  express.raw({ type: 'application/octet-stream', limit: '50mb' }),
+  '/upload',
   apiKeyAuth,
-  uploadController.uploadBinary
+  upload.single('encrypted_file'),
+  uploadController.uploadDraft
 );
 
 /**
- * GET /api/v1/document/:hash/binary
- * Stream encrypted data từ MinIO
+ * API 2: GET /api/v1/documents/pending
+ */
+router.get(
+  '/documents/pending',
+  apiKeyAuth,
+  uploadController.getPendingDocuments
+);
+
+/**
+ * API 3: POST /api/v1/anchor
+ * Body JSON: { original_hash, signature }
+ */
+router.post(
+  '/anchor',
+  apiKeyAuth,
+  uploadController.anchorDocument
+);
+
+/**
+ * Utility: stream encrypted data từ MinIO cache
  */
 router.get('/document/:hash/binary', uploadController.serveBinary);
 
 /**
- * GET /api/v1/document/:hash/status
- * Trả trạng thái document
+ * Utility: status theo original_hash
  */
 router.get('/document/:hash/status', uploadController.getDocumentStatus);
 
 /**
- * GET /api/v1/operator/nonce?tenant_id=0x...&operator_address=0x...
- * Query operator nonce từ smart contract
+ * Utility: query operator nonce từ smart contract
  */
 router.get('/operator/nonce', uploadController.getOperatorNonce);
 

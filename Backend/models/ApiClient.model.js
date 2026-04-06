@@ -34,6 +34,10 @@ const apiClientSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    whitelisted_domains: {
+      type: [String],
+      default: [],
+    },
     last_used_at: {
       type: Date,
       default: null,
