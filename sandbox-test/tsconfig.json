@@ -3,7 +3,9 @@
     "target": "ESNext",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "baseUrl": ".",
+    "types": ["node"],
+    "allowSyntheticDefaultImports": true,
+    // "baseUrl": ".",
     "paths": {
       "@verzik/sdk": ["../verzik-sdk/ts_wrapper/src/index.ts"]
     },
