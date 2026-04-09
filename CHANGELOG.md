@@ -62,7 +62,7 @@ Dự án tuân thủ tiêu chuẩn [Semantic Versioning](https://semver.org/).
   - Không được kí tài liệu
   - Không được đồng kí
   - Không được cấu hình co-sign
-  - Không được trở thành 1 Tenant
+  - Không được trở thành 1 Tenant (Admin, Manager, Slasher, Treasury)
 - **Bổ sung thêm CLI cho từng role để test các hàm trong SDK cũng như là Smart Contract:**
   - Owner (Protocol)
   - Tenant (Admin, Slasher, Manager)
