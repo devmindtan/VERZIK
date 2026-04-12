@@ -1,60 +1,80 @@
 # Mô tả chức năng cho bộ Smart Contract `VoucherProtocol` + `VoucherProtocolReader`
 
-> Ghi chú đồng bộ: sau khi tối ưu kích thước bytecode, các hàm đọc `view` đã được tách khỏi `VoucherProtocol` sang `VoucherProtocolReader`. Contract `VoucherProtocol` hiện giữ logic ghi/chứng thực nghiệp vụ, còn `VoucherProtocolReader` đảm nhiệm API truy vấn và sử dụng thêm một số getter hỗ trợ ở cuối contract core.
+> Ghi chú đồng bộ (2026-04-12): kiến trúc hiện tại đã chuyển sang mô hình `VoucherProtocol` mỏng + 4 external library (`OperatorLib`, `DocumentLib`, `CoSignLib`, `RecoveryLib`) để giảm bytecode. `VoucherProtocolReader` vẫn là lớp truy vấn chính, nhưng `VoucherProtocol` vẫn giữ một nhóm getter hỗ trợ tương thích ABI cho Reader và SDK.
 
-### Danh sách hàm đã mô tả:
+> Lưu ý quan trọng: một số đoạn code minh họa chi tiết ở các mục phía dưới được viết theo bản trước refactor (trước khi tách library). Danh sách hàm bên dưới là **nguồn chuẩn hiện tại** theo code đang compile/deploy.
+
+### Danh sách hàm đã mô tả (đồng bộ theo code hiện tại):
 
 1. Constructor - Khởi tạo protocol
-2. joinAsOperator - Tuyển dụng operator mới
-3. topUpStake - Nạp thêm stake
-4. updateOperatorMetadata - Cập nhật hồ sơ
-5. requestUnstake - Yêu cầu rút stake
-6. executeUnstake - Thực thi rút stake
-7. registerWithSignature - Anchor tài liệu với chữ ký EIP-712
-8. \_recoverSigner - Recover signer từ payload
-9. verify - Tra cứu trạng thái tài liệu (`VoucherProtocolReader`)
-10. getDocumentOrRevert - Lấy metadata tài liệu (`VoucherProtocolReader`)
-11. revokeDocument - Thu hồi tài liệu
-12. setOperatorStatus - Quản lý operator
-13. setTreasury - Cập nhật treasury
-14. slashOperator - Hard slash (tịch thu 100% stake)
-15. setRecoveryDelegate - Thiết lập ví dự phòng khôi phục
-16. recoverOperatorByDelegate - Khôi phục ví bị mất bằng delegate đã đăng ký
-17. recoverOperatorByAdmin - Khôi phục khẩn cấp bằng governance
+2. createTenant - Tạo tenant mới (mô hình 3 vai trò: admin/operatorManager/treasury)
+3. setTenantStatus - Bật/tắt tenant ở tầng protocol
+
+4. joinAsOperator - Tuyển dụng operator mới
+5. topUpStake - Nạp thêm stake
+6. updateOperatorMetadata - Cập nhật hồ sơ
+7. requestUnstake - Yêu cầu rút stake
+8. executeUnstake - Thực thi rút stake
+9. setOperatorStatus - Quản lý trạng thái operator
+10. setTreasury - Cập nhật treasury
+11. slashOperator - Hard slash (quyền thuộc operatorManager)
+12. softSlashOperator - Soft slash theo penalty
+13. setMinOperatorStake - Cấu hình stake tối thiểu
+14. setUnstakeCooldown - Cấu hình cooldown
+15. setViolationPenalty - Cấu hình mức phạt theo violation code
+
+16. registerWithSignature - Anchor tài liệu với chữ ký EIP-712
+17. revokeDocument - Thu hồi tài liệu
 18. coSignDocumentWithSignature - Đồng ký tài liệu đã anchor
-19. \_recoverCoSigner - Recover signer cho payload đồng ký
-20. hasSignedDocument - Kiểm tra 1 địa chỉ đã ký tài liệu chưa (`VoucherProtocolReader`)
-21. setCoSignPolicy - Cấu hình chính sách co-sign theo docType
-22. setCoSignOperator - Cấu hình whitelist + role co-sign cho operator
-23. isDocumentCoSignQualified - Kiểm tra tài liệu đã đạt quorum co-sign chưa (`VoucherProtocolReader`)
-24. getCoSignStatus - Tra cứu tiến trình co-sign theo policy (`VoucherProtocolReader`)
-25. setMinOperatorStake - Cấu hình stake tối thiểu cho operator tham gia
-26. setUnstakeCooldown - Cấu hình thời gian chờ rút stake
-27. setViolationPenalty - Cấu hình mức phạt (BPS) theo từng mã vi phạm
-28. softSlashOperator - Soft slash theo mức phạt đã cấu hình cho từng lỗi
-29. createTenant - Tạo tenant mới với admin/treasury riêng
-30. setTenantStatus - Bật/tắt tenant ở tầng protocol
-31. getTenantCount - Trả số lượng tenant đã khởi tạo (`VoucherProtocolReader`)
-32. \_enforceCoSignPolicy - Kiểm tra tổng hợp điều kiện co-sign cho signer
-33. \_evaluateCoSignQualification - Đánh giá và cập nhật cờ qualified cho tài liệu
-34. \_roleToMask - Chuyển roleId sang bitmask quorum
-35. \_getTenantAdminRole - Sinh role admin động theo tenantId
-36. \_getTenantSlasherRole - Sinh role slasher động theo tenantId
-37. \_getTenantOperatorManagerRole - Sinh role operator-manager động theo tenantId
-38. getTenantIds - Trả danh sách tenantId theo phân trang (`VoucherProtocolReader`)
-39. getTenantInfo - Trả trạng thái và thông tin quản trị của tenantId (`VoucherProtocolReader`)
-40. getOperatorStatus - Trả snapshot trạng thái operator theo tenant (`VoucherProtocolReader`)
-41. getDocumentStatus - Trả snapshot tài liệu + tiến trình co-sign (`VoucherProtocolReader`)
-42. getCoSignPolicy - Trả policy co-sign theo tenant và docType (`VoucherProtocolReader`)
-43. getCoSignOperatorConfig - Trả whitelist + role co-sign của operator (`VoucherProtocolReader`)
-44. getTenantRuntimeConfig - Trả config runtime cốt lõi của tenant (`VoucherProtocolReader`)
-45. getViolationPenalty - Trả penalty BPS theo mã vi phạm (`VoucherProtocolReader`)
-46. getDocument - Getter hỗ trợ `VoucherProtocolReader`
-47. getCoSignPolicyStruct - Getter hỗ trợ `VoucherProtocolReader`
-48. getTenantStruct - Getter hỗ trợ `VoucherProtocolReader`
-49. getOperatorStruct - Getter hỗ trợ `VoucherProtocolReader`
-50. getTenantListLength - Getter hỗ trợ `VoucherProtocolReader`
-51. getTenantAtIndex - Getter hỗ trợ `VoucherProtocolReader`
+19. setCoSignPolicy - Cấu hình chính sách co-sign theo docType
+20. setCoSignOperator - Cấu hình whitelist + role co-sign cho operator
+
+21. setRecoveryDelegate - Thiết lập ví dự phòng khôi phục
+22. recoverOperatorByDelegate - Khôi phục ví bị mất bằng delegate
+23. recoverOperatorByAdmin - Khôi phục khẩn cấp bằng governance
+
+24. grantRole (override) - Enforce tách biệt tenant governance role
+25. \_roleToMask - Chuyển roleId sang bitmask quorum (`VoucherProtocolHelper`)
+26. \_getTenantAdminRole - Sinh role admin động theo tenantId (`VoucherProtocolHelper`)
+27. \_getTenantOperatorManagerRole - Sinh role operator-manager động theo tenantId (`VoucherProtocolHelper`)
+
+28. verify - Tra cứu trạng thái tài liệu (`VoucherProtocolReader`)
+29. getDocumentOrRevert - Lấy metadata tài liệu (`VoucherProtocolReader`)
+30. hasSignedDocument - Kiểm tra 1 địa chỉ đã ký tài liệu chưa (`VoucherProtocolReader`)
+31. isDocumentCoSignQualified - Kiểm tra tài liệu đã đạt quorum co-sign chưa (`VoucherProtocolReader`)
+32. getCoSignStatus - Tra cứu tiến trình co-sign theo policy (`VoucherProtocolReader`)
+33. getTenantIds - Trả danh sách tenantId theo phân trang (`VoucherProtocolReader`)
+34. getTenantInfo - Trả trạng thái và thông tin quản trị tenant (`VoucherProtocolReader`)
+35. getTenantCount - Trả số lượng tenant (`VoucherProtocolReader`)
+36. getOperatorIds - Trả danh sách operator theo phân trang (`VoucherProtocolReader`)
+37. getOperatorCount - Trả số lượng operator (`VoucherProtocolReader`)
+38. getOperatorStatus - Trả snapshot trạng thái operator (`VoucherProtocolReader`)
+39. getDocumentStatus - Trả snapshot tài liệu + co-sign (`VoucherProtocolReader`)
+40. getCoSignPolicy - Trả policy co-sign (`VoucherProtocolReader`)
+41. getCoSignOperatorConfig - Trả whitelist + role co-sign (`VoucherProtocolReader`)
+42. getTenantRuntimeConfig - Trả config runtime tenant (`VoucherProtocolReader`)
+43. getViolationPenalty - Trả penalty BPS (`VoucherProtocolReader`)
+44. getRecoveryAliasStatus - Trả trạng thái recovery alias (`VoucherProtocolReader`)
+
+45. getDocument - Getter hỗ trợ Reader/SDK (`VoucherProtocol`)
+46. getCoSignPolicyStruct - Getter hỗ trợ Reader/SDK (`VoucherProtocol`)
+47. getTenantStruct - Getter hỗ trợ Reader/SDK (`VoucherProtocol`)
+48. getOperatorStruct - Getter hỗ trợ Reader/SDK (`VoucherProtocol`)
+49. getTenantListLength - Getter hỗ trợ Reader/SDK (`VoucherProtocol`)
+50. getTenantAtIndex - Getter hỗ trợ Reader/SDK (`VoucherProtocol`)
+51. getOperatorListLength - Getter hỗ trợ Reader/SDK (`VoucherProtocol`)
+52. getOperatorAtIndex - Getter hỗ trợ Reader/SDK (`VoucherProtocol`)
+53. getRecoveryAlias - Getter hỗ trợ Reader/SDK (`VoucherProtocol`)
+54. documentSigners - Backward-compatible getter (`VoucherProtocol`)
+55. coSignCount - Backward-compatible getter (`VoucherProtocol`)
+56. trustedCoSignCount - Backward-compatible getter (`VoucherProtocol`)
+57. trustedCoSignRoleMask - Backward-compatible getter (`VoucherProtocol`)
+58. coSignQualified - Backward-compatible getter (`VoucherProtocol`)
+59. tenantCoSignWhitelisted - Backward-compatible getter (`VoucherProtocol`)
+60. tenantCoSignRoles - Backward-compatible getter (`VoucherProtocol`)
+61. tenantMinOperatorStake - Backward-compatible getter (`VoucherProtocol`)
+62. tenantUnstakeCooldown - Backward-compatible getter (`VoucherProtocol`)
+63. tenantViolationPenalties - Backward-compatible getter (`VoucherProtocol`)
 
 ### Mỗi hàm gồm:
 
@@ -114,6 +134,8 @@ _Code_
 
 ```solidity
 function joinAsOperator(bytes32 tenantId, string calldata _metadataURI) external payable {
+    // Protocol Admin không được tham gia là Operator để tránh xung đột lợi ích.
+    if (hasRole(PROTOCOL_ADMIN_ROLE, msg.sender)) revert ProtocolAdminCannotHaveOtherRoles();
     // Tenant phải tồn tại trước khi nhận operator mới.
     if (tenants[tenantId].admin == address(0)) revert TenantNotFound();
     // Tenant đang bị vô hiệu thì không cho phép onboarding thêm operator.
@@ -146,13 +168,14 @@ function joinAsOperator(bytes32 tenantId, string calldata _metadataURI) external
 
 _Giải thích_
 
-| **Thành phần**                      | **Ý nghĩa kỹ thuật**                                                              |
-| ----------------------------------- | --------------------------------------------------------------------------------- |
-| **tenantId**                        | Xác định operator đang gia nhập tenant nào, tránh đụng dữ liệu giữa các tenant.   |
-| **tenantMinOperatorStake**          | Mỗi tenant có stake tối thiểu riêng, không còn dùng một cấu hình global duy nhất. |
-| **TenantInactive**                  | Tenant bị khóa sẽ không thể tuyển thêm operator mới.                              |
-| **operators[tenantId][msg.sender]** | Mọi operator đều được namespace hóa theo tenant.                                  |
-| **pendingUnstakeAt = 0**            | Reset cooldown rút stake khi operator vừa join.                                   |
+| **Thành phần**                        | **Ý nghĩa kỹ thuật**                                                              |
+| ------------------------------------- | --------------------------------------------------------------------------------- |
+| **tenantId**                          | Xác định operator đang gia nhập tenant nào, tránh đụng dữ liệu giữa các tenant.   |
+| **tenantMinOperatorStake**            | Mỗi tenant có stake tối thiểu riêng, không còn dùng một cấu hình global duy nhất. |
+| **TenantInactive**                    | Tenant bị khóa sẽ không thể tuyển thêm operator mới.                              |
+| **ProtocolAdminCannotHaveOtherRoles** | Chặn ví có `PROTOCOL_ADMIN_ROLE` tham gia trực tiếp với vai trò operator.         |
+| **operators[tenantId][msg.sender]**   | Mọi operator đều được namespace hóa theo tenant.                                  |
+| **pendingUnstakeAt = 0**              | Reset cooldown rút stake khi operator vừa join.                                   |
 
 ---
 
@@ -335,6 +358,8 @@ function registerWithSignature(
 
     // Recover signer thực sự từ payload và chữ ký.
     address signer = _recoverSigner(payload, signature);
+    // Protocol Admin không được ký tài liệu để tránh xung đột lợi ích.
+    if (hasRole(PROTOCOL_ADMIN_ROLE, signer)) revert ProtocolAdminCannotHaveOtherRoles();
     // Signer phải là operator đã đăng ký trong tenant.
     if (operators[payload.tenantId][signer].stakeAmount == 0) revert OperatorNotInTenant();
     // Signer phải đang active mới được anchor tài liệu.
@@ -408,13 +433,14 @@ function registerWithSignature(
 
 _Giải thích_
 
-| **Thành phần**                    | **Ý nghĩa kỹ thuật**                                                          |
-| --------------------------------- | ----------------------------------------------------------------------------- |
-| **RegisterPayload.tenantId**      | Tài liệu được anchor trong đúng namespace tenant.                             |
-| **documents[tenantId][fileHash]** | Một `fileHash` có thể tồn tại độc lập ở nhiều tenant mà không đè nhau.        |
-| **nonces[tenantId][signer]**      | Nonce giờ không còn global, mà tách theo tenant để chống replay đúng phạm vi. |
-| **co-sign bootstrap**             | Issuer đầu tiên vẫn được tính là signer đầu tiên của tài liệu.                |
-| **tenantCoSignPolicies**          | Chính sách co-sign giờ do từng tenant quản lý riêng.                          |
+| **Thành phần**                        | **Ý nghĩa kỹ thuật**                                                          |
+| ------------------------------------- | ----------------------------------------------------------------------------- |
+| **RegisterPayload.tenantId**          | Tài liệu được anchor trong đúng namespace tenant.                             |
+| **documents[tenantId][fileHash]**     | Một `fileHash` có thể tồn tại độc lập ở nhiều tenant mà không đè nhau.        |
+| **nonces[tenantId][signer]**          | Nonce giờ không còn global, mà tách theo tenant để chống replay đúng phạm vi. |
+| **ProtocolAdminCannotHaveOtherRoles** | Chặn signer có `PROTOCOL_ADMIN_ROLE` dùng luồng anchor tài liệu.              |
+| **co-sign bootstrap**                 | Issuer đầu tiên vẫn được tính là signer đầu tiên của tài liệu.                |
+| **tenantCoSignPolicies**              | Chính sách co-sign giờ do từng tenant quản lý riêng.                          |
 
 ---
 
@@ -615,6 +641,8 @@ function setTreasury(bytes32 tenantId, address newTreasury) external {
     if (!hasRole(_getTenantAdminRole(tenantId), msg.sender)) revert Unauthorized();
     // Treasury mới không được là zero address.
     if (newTreasury == address(0)) revert InvalidTenantAddress();
+    // Protocol Admin không được trở thành treasury của tenant.
+    if (hasRole(PROTOCOL_ADMIN_ROLE, newTreasury)) revert ProtocolAdminCannotHaveOtherRoles();
 
     // Lưu lại treasury cũ để phát event đối chiếu.
     address oldTreasury = tenants[tenantId].treasury;
@@ -628,11 +656,12 @@ function setTreasury(bytes32 tenantId, address newTreasury) external {
 
 _Giải thích_
 
-| **Thành phần**           | **Ý nghĩa kỹ thuật**                           |
-| ------------------------ | ---------------------------------------------- |
-| **tenantId**             | Mỗi tenant có treasury độc lập.                |
-| **\_getTenantAdminRole** | Chỉ admin của tenant đó mới đổi được treasury. |
-| **oldTreasury**          | Dùng cho audit trail thay đổi ví nhận slash.   |
+| **Thành phần**                        | **Ý nghĩa kỹ thuật**                                      |
+| ------------------------------------- | --------------------------------------------------------- |
+| **tenantId**                          | Mỗi tenant có treasury độc lập.                           |
+| **\_getTenantAdminRole**              | Chỉ admin của tenant đó mới đổi được treasury.            |
+| **ProtocolAdminCannotHaveOtherRoles** | Chặn đổi treasury sang ví đang giữ `PROTOCOL_ADMIN_ROLE`. |
+| **oldTreasury**                       | Dùng cho audit trail thay đổi ví nhận slash.              |
 
 ---
 
@@ -650,8 +679,8 @@ function slashOperator(
 ) external nonReentrant {
     // Tenant phải tồn tại trước khi thực thi hard slash.
     if (tenants[tenantId].admin == address(0)) revert TenantNotFound();
-    // Chỉ slasher role của tenant mới được slash.
-    if (!hasRole(_getTenantSlasherRole(tenantId), msg.sender)) revert Unauthorized();
+    // Chỉ operator-manager role của tenant mới được slash.
+    if (!hasRole(_getTenantOperatorManagerRole(tenantId), msg.sender)) revert Unauthorized();
 
     // Lấy stake hiện tại của operator bị xử lý.
     uint256 amount = operators[tenantId][_operator].stakeAmount;
@@ -681,12 +710,12 @@ function slashOperator(
 
 _Giải thích_
 
-| **Thành phần**               | **Ý nghĩa kỹ thuật**                             |
-| ---------------------------- | ------------------------------------------------ |
-| **\_getTenantSlasherRole**   | Quyền hard slash được tách riêng theo tenant.    |
-| **Hard slash 100%**          | Vẫn giữ nguyên semantics tịch thu toàn bộ stake. |
-| **tenant treasury**          | Tiền slash chuyển về treasury của đúng tenant.   |
-| **delete recoveryDelegates** | Giảm rủi ro recovery sau khi đã bị hard slash.   |
+| **Thành phần**                     | **Ý nghĩa kỹ thuật**                                |
+| ---------------------------------- | --------------------------------------------------- |
+| **\_getTenantOperatorManagerRole** | Quyền hard slash thuộc operator-manager của tenant. |
+| **Hard slash 100%**                | Vẫn giữ nguyên semantics tịch thu toàn bộ stake.    |
+| **tenant treasury**                | Tiền slash chuyển về treasury của đúng tenant.      |
+| **delete recoveryDelegates**       | Giảm rủi ro recovery sau khi đã bị hard slash.      |
 
 ---
 
@@ -706,6 +735,8 @@ function setRecoveryDelegate(bytes32 tenantId, address delegate) external {
     if (delegate == address(0)) revert InvalidRecoveryTarget();
     // Delegate không được trỏ về chính operator hiện tại.
     if (delegate == msg.sender) revert InvalidRecoveryTarget();
+    // Protocol Admin không được trở thành recovery delegate của operator.
+    if (hasRole(PROTOCOL_ADMIN_ROLE, delegate)) revert ProtocolAdminCannotHaveOtherRoles();
 
     // Lưu delegate dự phòng cho operator trong tenant này.
     recoveryDelegates[tenantId][msg.sender] = delegate;
@@ -717,12 +748,13 @@ function setRecoveryDelegate(bytes32 tenantId, address delegate) external {
 
 _Giải thích_
 
-| **Thành phần**                            | **Ý nghĩa kỹ thuật**                               |
-| ----------------------------------------- | -------------------------------------------------- |
-| **recoveryDelegates[tenantId][operator]** | Delegate được lưu riêng theo từng tenant.          |
-| **delegate != address(0)**                | Tránh cấu hình rỗng.                               |
-| **delegate != operator**                  | Tránh tự trỏ về chính ví hiện tại.                 |
-| **event có tenantId**                     | Giúp audit lịch sử recovery chính xác theo tenant. |
+| **Thành phần**                            | **Ý nghĩa kỹ thuật**                                                 |
+| ----------------------------------------- | -------------------------------------------------------------------- |
+| **recoveryDelegates[tenantId][operator]** | Delegate được lưu riêng theo từng tenant.                            |
+| **delegate != address(0)**                | Tránh cấu hình rỗng.                                                 |
+| **delegate != operator**                  | Tránh tự trỏ về chính ví hiện tại.                                   |
+| **ProtocolAdminCannotHaveOtherRoles**     | Chặn cấu hình một ví có `PROTOCOL_ADMIN_ROLE` làm delegate recovery. |
+| **event có tenantId**                     | Giúp audit lịch sử recovery chính xác theo tenant.                   |
 
 ---
 
@@ -736,6 +768,8 @@ _Code_
 function recoverOperatorByDelegate(bytes32 tenantId, address lostOperator, string calldata reason) external {
     // Tenant phải tồn tại trước khi chạy recovery.
     if (tenants[tenantId].admin == address(0)) revert TenantNotFound();
+    // Protocol Admin không được trở thành operator thông qua delegate recovery.
+    if (hasRole(PROTOCOL_ADMIN_ROLE, msg.sender)) revert ProtocolAdminCannotHaveOtherRoles();
     // Operator cũ phải không active thì mới xem là bị mất/offline.
     if (operators[tenantId][lostOperator].isActive) revert OperatorNotLost();
     // Operator cũ phải còn stake thì recovery mới có ý nghĩa.
@@ -784,12 +818,13 @@ function recoverOperatorByDelegate(bytes32 tenantId, address lostOperator, strin
 
 _Giải thích_
 
-| **Thành phần**               | **Ý nghĩa kỹ thuật**                                                    |
-| ---------------------------- | ----------------------------------------------------------------------- |
-| **OperatorNotLost**          | Bảo vệ logic recovery: chỉ recovery khi ví cũ thực sự không còn active. |
-| **RecoveryNotAllowed**       | Chỉ delegate đã đăng ký trong đúng tenant mới được nhận quyền.          |
-| **Migrate operator + nonce** | Giữ continuity của stake, metadata và luồng ký EIP-712.                 |
-| **delete state cũ**          | Dọn sạch dữ liệu ví cũ sau khi recovery.                                |
+| **Thành phần**                        | **Ý nghĩa kỹ thuật**                                                       |
+| ------------------------------------- | -------------------------------------------------------------------------- |
+| **OperatorNotLost**                   | Bảo vệ logic recovery: chỉ recovery khi ví cũ thực sự không còn active.    |
+| **RecoveryNotAllowed**                | Chỉ delegate đã đăng ký trong đúng tenant mới được nhận quyền.             |
+| **ProtocolAdminCannotHaveOtherRoles** | Chặn ví có `PROTOCOL_ADMIN_ROLE` trở thành operator qua delegate recovery. |
+| **Migrate operator + nonce**          | Giữ continuity của stake, metadata và luồng ký EIP-712.                    |
+| **delete state cũ**                   | Dọn sạch dữ liệu ví cũ sau khi recovery.                                   |
 
 ---
 
@@ -814,6 +849,8 @@ function recoverOperatorByAdmin(
     if (operators[tenantId][lostOperator].isActive) revert OperatorNotLost();
     // Ví mới phải hợp lệ và không được trùng ví cũ.
     if (newOperator == address(0) || newOperator == lostOperator) revert InvalidRecoveryTarget();
+    // Protocol Admin không được trở thành operator thông qua admin recovery.
+    if (hasRole(PROTOCOL_ADMIN_ROLE, newOperator)) revert ProtocolAdminCannotHaveOtherRoles();
     // Ví mới không được ghi đè lên operator đã tồn tại.
     if (operators[tenantId][newOperator].stakeAmount != 0 || operators[tenantId][newOperator].isActive) {
         revert InvalidRecoveryTarget();
@@ -854,12 +891,13 @@ function recoverOperatorByAdmin(
 
 _Giải thích_
 
-| **Thành phần**                     | **Ý nghĩa kỹ thuật**                                   |
-| ---------------------------------- | ------------------------------------------------------ |
-| **\_getTenantOperatorManagerRole** | Governance recovery giờ scoped theo tenant.            |
-| **InvalidRecoveryTarget**          | Chặn ghi đè ví mới không hợp lệ hoặc đã tồn tại state. |
-| **Migrate state có kiểm soát**     | Giữ continuity nghiệp vụ trong cùng tenant.            |
-| **reason**                         | Audit rõ lý do recovery khẩn cấp.                      |
+| **Thành phần**                        | **Ý nghĩa kỹ thuật**                                     |
+| ------------------------------------- | -------------------------------------------------------- |
+| **\_getTenantOperatorManagerRole**    | Governance recovery giờ scoped theo tenant.              |
+| **InvalidRecoveryTarget**             | Chặn ghi đè ví mới không hợp lệ hoặc đã tồn tại state.   |
+| **ProtocolAdminCannotHaveOtherRoles** | Chặn dùng ví có `PROTOCOL_ADMIN_ROLE` làm `newOperator`. |
+| **Migrate state có kiểm soát**        | Giữ continuity nghiệp vụ trong cùng tenant.              |
+| **reason**                            | Audit rõ lý do recovery khẩn cấp.                        |
 
 ---
 
@@ -890,6 +928,8 @@ function coSignDocumentWithSignature(
 
     // Recover signer thực sự từ payload co-sign.
     address signer = _recoverCoSigner(payload, signature);
+    // Protocol Admin không được co-sign để tránh xung đột lợi ích.
+    if (hasRole(PROTOCOL_ADMIN_ROLE, signer)) revert ProtocolAdminCannotHaveOtherRoles();
     // Signer phải là operator thuộc tenant tương ứng.
     if (operators[payload.tenantId][signer].stakeAmount == 0) revert OperatorNotInTenant();
     // Signer phải đang active thì mới được đồng ký.
@@ -937,12 +977,13 @@ function coSignDocumentWithSignature(
 
 _Giải thích_
 
-| **Thành phần**                    | **Ý nghĩa kỹ thuật**                                        |
-| --------------------------------- | ----------------------------------------------------------- |
-| **payload.tenantId**              | Co-sign được gắn chặt vào đúng tenant.                      |
-| **AlreadyCoSigned**               | Chặn một signer ký lặp trên cùng document của cùng tenant.  |
-| **tenantCoSignPolicies**          | Chính sách co-sign tách riêng theo tenant và `docType`.     |
-| **trustedCoSignCount + roleMask** | Tiếp tục giữ quorum logic như cũ, nhưng ở namespace tenant. |
+| **Thành phần**                        | **Ý nghĩa kỹ thuật**                                        |
+| ------------------------------------- | ----------------------------------------------------------- |
+| **payload.tenantId**                  | Co-sign được gắn chặt vào đúng tenant.                      |
+| **AlreadyCoSigned**                   | Chặn một signer ký lặp trên cùng document của cùng tenant.  |
+| **ProtocolAdminCannotHaveOtherRoles** | Chặn signer có `PROTOCOL_ADMIN_ROLE` tham gia co-sign.      |
+| **tenantCoSignPolicies**              | Chính sách co-sign tách riêng theo tenant và `docType`.     |
+| **trustedCoSignCount + roleMask**     | Tiếp tục giữ quorum logic như cũ, nhưng ở namespace tenant. |
 
 ---
 
@@ -1073,6 +1114,8 @@ function setCoSignOperator(
     if (!hasRole(_getTenantOperatorManagerRole(tenantId), msg.sender)) revert Unauthorized();
     // Operator không được là zero address.
     if (operator == address(0)) revert Unauthorized();
+    // Protocol Admin không được được whitelist làm co-signer để tránh xung đột.
+    if (whitelisted && hasRole(PROTOCOL_ADMIN_ROLE, operator)) revert ProtocolAdminCannotHaveOtherRoles();
 
     // Nếu thêm vào whitelist thì role bắt buộc phải hợp lệ.
     if (whitelisted) {
@@ -1099,11 +1142,12 @@ function setCoSignOperator(
 
 _Giải thích_
 
-| **Thành phần**              | **Ý nghĩa kỹ thuật**                                          |
-| --------------------------- | ------------------------------------------------------------- |
-| **tenantCoSignWhitelisted** | Danh sách whitelist nằm riêng trong mỗi tenant.               |
-| **tenantCoSignRoles**       | Role co-sign được quản lý riêng cho từng tenant và `docType`. |
-| **COSIGN_ROLE_NONE**        | Khi remove khỏi whitelist thì role được reset rõ ràng.        |
+| **Thành phần**                        | **Ý nghĩa kỹ thuật**                                           |
+| ------------------------------------- | -------------------------------------------------------------- |
+| **tenantCoSignWhitelisted**           | Danh sách whitelist nằm riêng trong mỗi tenant.                |
+| **tenantCoSignRoles**                 | Role co-sign được quản lý riêng cho từng tenant và `docType`.  |
+| **ProtocolAdminCannotHaveOtherRoles** | Không cho whitelist ví có `PROTOCOL_ADMIN_ROLE` làm co-signer. |
+| **COSIGN_ROLE_NONE**                  | Khi remove khỏi whitelist thì role được reset rõ ràng.         |
 
 ---
 
@@ -1301,8 +1345,8 @@ function softSlashOperator(
 ) external nonReentrant {
     // Tenant phải tồn tại trước khi soft slash.
     if (tenants[tenantId].admin == address(0)) revert TenantNotFound();
-    // Chỉ slasher role của tenant mới được thực thi soft slash.
-    if (!hasRole(_getTenantSlasherRole(tenantId), msg.sender)) revert Unauthorized();
+    // Chỉ operator-manager role của tenant mới được thực thi soft slash.
+    if (!hasRole(_getTenantOperatorManagerRole(tenantId), msg.sender)) revert Unauthorized();
 
     // Lấy tổng stake hiện tại của operator bị xử lý.
     uint256 stakeBefore = operators[tenantId][_operator].stakeAmount;
@@ -1371,26 +1415,34 @@ _Giải thích_
 
 ## 29. createTenant
 
-> _**Mục tiêu:** Khởi tạo một tenant mới với admin, treasury và bộ config mặc định hoàn toàn độc lập trong hệ thống multi-tenant._
+> _**Mục tiêu:** Khởi tạo một tenant mới với admin, treasury và bộ config runtime độc lập hoàn toàn, đồng thời tách ví quản trị tenant ngay từ đầu để giảm chi phí vận hành về sau._
 
 _Code_
 
 ```solidity
 function createTenant(
     bytes32 tenantId,
-    address tenantAdmin,
-    address tenantTreasury
+    address tenantTreasury,
+    TenantConfig calldata config
 ) external onlyRole(PROTOCOL_ADMIN_ROLE) {
     // Tenant id không được rỗng vì sẽ dùng làm namespace cho toàn bộ dữ liệu.
     if (tenantId == bytes32(0)) revert InvalidConfigValue();
     // Admin và treasury phải là địa chỉ hợp lệ khác zero.
-    if (tenantAdmin == address(0) || tenantTreasury == address(0)) revert InvalidTenantAddress();
+    if (config.admin == address(0) || tenantTreasury == address(0)) revert InvalidTenantAddress();
+    // OperatorManager phải là địa chỉ hợp lệ khác zero.
+    if (config.operatorManager == address(0)) revert InvalidTenantAddress();
+    // Protocol Admin không được là tenant (admin, operator manager, treasury) để đảm bảo tách biệt quyền hạn.
+    if (hasRole(PROTOCOL_ADMIN_ROLE, config.admin) || hasRole(PROTOCOL_ADMIN_ROLE, config.operatorManager) || hasRole(PROTOCOL_ADMIN_ROLE, tenantTreasury)) revert ProtocolAdminCannotHaveOtherRoles();
+    // minStake phải lớn hơn 0 để đảm bảo economic barrier cho operator.
+    if (config.minStake == 0) revert InvalidConfigValue();
+    // unstakeCooldown phải lớn hơn 0 để đảm bảo luôn có cửa sổ quan sát rủi ro.
+    if (config.unstakeCooldown == 0) revert InvalidConfigValue();
     // Mỗi tenant id chỉ được khởi tạo duy nhất một lần.
     if (tenants[tenantId].admin != address(0)) revert TenantAlreadyExists();
 
     // Lưu tenant mới vào registry toàn cục.
     tenants[tenantId] = Tenant({
-        admin: tenantAdmin,
+        admin: config.admin,
         treasury: tenantTreasury,
         isActive: true,
         createdAt: block.timestamp
@@ -1399,35 +1451,39 @@ function createTenant(
     // Thêm tenant id vào danh sách để có thể enumerate off-chain.
     tenantList.push(tenantId);
 
-    // Tạo và cấp role admin động gắn riêng cho tenant này.
+    // Tạo các role động gắn riêng cho tenant này.
     bytes32 tenantAdminRole = _getTenantAdminRole(tenantId);
-    bytes32 tenantSlasherRole = _getTenantSlasherRole(tenantId);
     bytes32 tenantOperatorManagerRole = _getTenantOperatorManagerRole(tenantId);
 
-    _grantRole(tenantAdminRole, tenantAdmin);
-    _grantRole(tenantSlasherRole, tenantAdmin);
-    _grantRole(tenantOperatorManagerRole, tenantAdmin);
+    _grantRole(tenantAdminRole, config.admin);
+    _grantRole(tenantOperatorManagerRole, config.operatorManager);
 
-    // Khởi tạo config mặc định cho tenant mới.
-    tenantMinOperatorStake[tenantId] = MIN_STAKE;
-    tenantUnstakeCooldown[tenantId] = UNSTAKE_COOLDOWN;
+    // Thiết lập hệ thống phân quyền nội bộ cho tenant.
+    _setRoleAdmin(tenantAdminRole, tenantAdminRole);
+    _setRoleAdmin(tenantOperatorManagerRole, tenantAdminRole);
+
+    // Khởi tạo config runtime cho tenant mới.
+    tenantMinOperatorStake[tenantId] = config.minStake;
+    tenantUnstakeCooldown[tenantId] = config.unstakeCooldown;
 
     // Phát event để indexer ghi nhận tenant vừa được tạo.
-    emit TenantCreated(tenantId, tenantAdmin, tenantTreasury);
+    emit TenantCreated(tenantId, config.admin, tenantTreasury);
 }
 ```
 
 _Giải thích_
 
-| **Thành phần**                | **Ý nghĩa kỹ thuật**                                                            |
-| ----------------------------- | ------------------------------------------------------------------------------- |
-| **PROTOCOL_ADMIN_ROLE**       | Chỉ protocol owner mới được tạo tenant mới, không cho phép bất kỳ ai tự tạo.    |
-| **tenantId**                  | Đóng vai trò namespace cho toàn bộ dữ liệu operator/document/config của tenant. |
-| **TenantAlreadyExists**       | Bảo đảm mỗi tenantId chỉ được khởi tạo 1 lần duy nhất.                          |
-| **Dynamic role per tenant**   | 3 role được sinh và cấp tự động: ADMIN, SLASHER, OPERATOR_MANAGER.              |
-| **tenantMinOperatorStake**    | Được khởi tạo từ hằng số `MIN_STAKE` làm giá trị mặc định ban đầu.              |
-| **tenantUnstakeCooldown**     | Được khởi tạo từ hằng số `UNSTAKE_COOLDOWN` làm giá trị mặc định ban đầu.       |
-| **tenantList.push(tenantId)** | Lưu vào mảng để có thể đọc danh sách tenant off-chain mà không cần event.       |
+| **Thành phần**                        | **Ý nghĩa kỹ thuật**                                                                                                               |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **PROTOCOL_ADMIN_ROLE**               | Chỉ ví có quyền quản trị protocol mới được tạo tenant mới ở tầng hệ thống.                                                         |
+| **tenantId**                          | Đóng vai trò namespace cho toàn bộ dữ liệu operator/document/config của tenant.                                                    |
+| **TenantConfig**                      | Gói cấu hình khởi tạo dùng thực tế: `admin`, `operatorManager`, `minStake`, `unstakeCooldown` (`slasher` đã được gộp vào manager). |
+| **TenantAlreadyExists**               | Bảo đảm mỗi tenantId chỉ được khởi tạo 1 lần duy nhất.                                                                             |
+| **ProtocolAdminCannotHaveOtherRoles** | Chặn Protocol Admin đồng thời trở thành `admin`, `operatorManager` hoặc `treasury` của tenant.                                     |
+| **Dynamic role per tenant**           | 2 role động theo tenant: `TENANT_ADMIN_ROLE` và `TENANT_OPERATOR_MANAGER_ROLE`.                                                    |
+| **tenantMinOperatorStake**            | Khởi tạo trực tiếp từ `config.minStake` thay vì dùng giá trị mặc định global.                                                      |
+| **tenantUnstakeCooldown**             | Khởi tạo trực tiếp từ `config.unstakeCooldown` theo nhu cầu tenant.                                                                |
+| **tenantList.push(tenantId)**         | Lưu vào mảng để có thể đọc danh sách tenant off-chain mà không cần event.                                                          |
 
 ---
 
@@ -1452,7 +1508,7 @@ _Giải thích_
 
 | **Thành phần**          | **Ý nghĩa kỹ thuật**                                                                                                         |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| **PROTOCOL_ADMIN_ROLE** | Chỉ protocol owner mới có quyền tắt/bật tenant, tenant admin không tự tắt được tenant của mình.                              |
+| **PROTOCOL_ADMIN_ROLE** | Chỉ ví có `PROTOCOL_ADMIN_ROLE` mới có quyền tắt/bật tenant, tenant admin không tự tắt được tenant của mình.                 |
 | **TenantNotFound**      | Guard ngăn thao tác trên tenant chưa được khởi tạo.                                                                          |
 | **isActive = false**    | Khi tenant bị tắt, `joinAsOperator`, `registerWithSignature`, `coSignDocumentWithSignature` đều revert với `TenantInactive`. |
 | **TenantStatusUpdated** | Event giúp indexer/subgraph theo dõi vòng đời tenant theo thời gian thực.                                                    |
@@ -1625,26 +1681,32 @@ _Giải thích_
 
 ---
 
-## 36. \_getTenantSlasherRole
+## 36. \_ensureNoTenantRoleCollisionOnCreate
 
-> _**Mục tiêu:** Sinh ra bytes32 role slasher duy nhất cho từng tenant để tách biệt quyền xử phạt operator giữa các tenant._
+> _**Mục tiêu:** Chặn trùng lặp 3 ví governance khi tạo tenant (`admin`, `operatorManager`, `treasury`). Hàm này nằm trong `VoucherProtocolHelper`._
 
 _Code_
 
 ```solidity
-function _getTenantSlasherRole(bytes32 tenantId) internal pure returns (bytes32) {
-    // Băm tên role với tenantId để tạo slasher role riêng cho tenant.
-    return keccak256(abi.encode("TENANT_SLASHER_ROLE", tenantId));
+function _ensureNoTenantRoleCollisionOnCreate(
+    address admin,
+    address operatorManager,
+    address treasury
+) internal pure {
+    if (admin == operatorManager || treasury == admin || treasury == operatorManager) {
+        revert IVoucherProtocolErrorsEvents.TenantRoleConflict();
+    }
 }
 ```
 
 _Giải thích_
 
-| **Thành phần**                       | **Ý nghĩa kỹ thuật**                                                          |
-| ------------------------------------ | ----------------------------------------------------------------------------- |
-| **"TENANT_SLASHER_ROLE" + tenantId** | Đảm bảo slasher của Tenant A không thể slash operator của Tenant B.           |
-| **pure**                             | Deterministic, không phụ thuộc state.                                         |
-| **Dùng ở đâu**                       | `createTenant` (grant), `slashOperator`, `softSlashOperator` (hasRole check). |
+| **Thành phần**                         | **Ý nghĩa kỹ thuật**                                                    |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| **admin / operatorManager / treasury** | 3 ví governance bắt buộc tách biệt ngay từ bước khởi tạo tenant.        |
+| **TenantRoleConflict**                 | Revert chuẩn hóa khi phát hiện chồng chéo role-governance trong tenant. |
+| **pure**                               | Kiểm tra logic thuần, không phụ thuộc state.                            |
+| **Dùng ở đâu**                         | `createTenant` trong `VoucherProtocol`.                                 |
 
 ---
 

@@ -20,3 +20,14 @@ _EIP-712 giải quyết 2 vấn đề lớn:_
 **Chi tiết tham khảo**
 
 - [eips.ethereum.org](https://eips.ethereum.org/EIPS/eip-712)
+
+| **Basis Points (Bps)** | **Phần trăm (%)** | **Ví dụ thực tế**                      |
+| ---------------------- | ----------------- | -------------------------------------- |
+| **1**                  | **0.01%**         | Phạt cực nhẹ, mang tính cảnh cáo.      |
+| **10**                 | **0.1%**          |                                        |
+| **50**                 | **0.5%**          |                                        |
+| **100**                | **1%**            | Mức phạt phổ biến cho lỗi nhẹ.         |
+| **500**                | **5%**            |                                        |
+| **1000**               | **10%**           | Phạt nặng (Soft Slash).                |
+| **5000**               | **50%**           | Phạt mất nửa số tiền Stake.            |
+| **10000**              | **100%**          | **Hard Slash** (Mất trắng tiền stake). |

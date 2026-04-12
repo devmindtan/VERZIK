@@ -2,14 +2,19 @@
 pragma solidity ^0.8.28;
 
 import "./VoucherProtocol.sol";
+import "./IVoucherProtocolErrorsEvents.sol";
+import "./VoucherTypes.sol";
 
 /**
  * @notice Reader contract để truy vấn state của VoucherProtocol mà không tăng bytecode.
  */
 contract VoucherProtocolReader {
-    VoucherProtocol public protocol;
+    error InvalidProtocolAddress();
+
+    VoucherProtocol public immutable protocol;
 
     constructor(address _protocol) {
+        if (_protocol == address(0)) revert InvalidProtocolAddress();
         protocol = VoucherProtocol(_protocol);
     }
 
@@ -18,7 +23,7 @@ contract VoucherProtocolReader {
         view
         returns (bool exists, bool isValid, address issuer, string memory cid)
     {
-        VoucherProtocol.Document memory doc = protocol.getDocument(tenantId, fileHash);
+        VoucherTypes.Document memory doc = protocol.getDocument(tenantId, fileHash);
         if (doc.issuer == address(0)) {
             return (false, false, address(0), "");
         }
@@ -28,10 +33,10 @@ contract VoucherProtocolReader {
     function getDocumentOrRevert(bytes32 tenantId, bytes32 fileHash)
         external
         view
-        returns (VoucherProtocol.Document memory)
+        returns (VoucherTypes.Document memory)
     {
-        VoucherProtocol.Document memory doc = protocol.getDocument(tenantId, fileHash);
-        if (doc.issuer == address(0)) revert VoucherProtocol.DocumentNotFound();
+        VoucherTypes.Document memory doc = protocol.getDocument(tenantId, fileHash);
+        if (doc.issuer == address(0)) revert IVoucherProtocolErrorsEvents.DocumentNotFound();
         return doc;
     }
 
@@ -64,10 +69,10 @@ contract VoucherProtocolReader {
             uint256 minStake
         )
     {
-        VoucherProtocol.Document memory doc = protocol.getDocument(tenantId, fileHash);
-        if (doc.issuer == address(0)) revert VoucherProtocol.DocumentNotFound();
+        VoucherTypes.Document memory doc = protocol.getDocument(tenantId, fileHash);
+        if (doc.issuer == address(0)) revert IVoucherProtocolErrorsEvents.DocumentNotFound();
 
-        VoucherProtocol.CoSignPolicy memory policy = protocol.getCoSignPolicyStruct(tenantId, doc.docType);
+        VoucherTypes.CoSignPolicy memory policy = protocol.getCoSignPolicyStruct(tenantId, doc.docType);
 
         return (
             protocol.coSignQualified(tenantId, fileHash),
@@ -87,7 +92,7 @@ contract VoucherProtocolReader {
     {
         uint256 total = protocol.getTenantListLength();
 
-        if (offset >= total) {
+        if (limit == 0 || offset >= total) {
             return new bytes32[](0);
         }
 
@@ -108,14 +113,16 @@ contract VoucherProtocolReader {
         returns (
             bool exists,
             address admin,
+            address operatorManager,
             address treasury,
             bool isActive,
             uint256 createdAt
         )
     {
-        VoucherProtocol.Tenant memory tenant = protocol.getTenantStruct(tenantId);
+        VoucherTypes.Tenant memory tenant = protocol.getTenantStruct(tenantId);
         exists = tenant.admin != address(0);
         admin = tenant.admin;
+        operatorManager = tenant.operatorManager;
         treasury = tenant.treasury;
         isActive = tenant.isActive;
         createdAt = tenant.createdAt;
@@ -125,12 +132,39 @@ contract VoucherProtocolReader {
         return protocol.getTenantListLength();
     }
 
+    function getOperatorIds(bytes32 tenantId, uint256 offset, uint256 limit)
+        external
+        view
+        returns (address[] memory ids)
+    {
+        uint256 total = protocol.getOperatorListLength(tenantId);
+
+        if (limit == 0 || offset >= total) {
+            return new address[](0);
+        }
+
+        uint256 end = offset + limit;
+        if (end > total) {
+            end = total;
+        }
+
+        ids = new address[](end - offset);
+        for (uint256 i = offset; i < end; i++) {
+            ids[i - offset] = protocol.getOperatorAtIndex(tenantId, i);
+        }
+    }
+
+    function getOperatorCount(bytes32 tenantId) external view returns (uint256) {
+        return protocol.getOperatorListLength(tenantId);
+    }
+
     function getOperatorStatus(bytes32 tenantId, address operator)
         external
         view
         returns (
             bool exists,
             bool isActive,
+            address walletAddress,
             string memory metadataURI,
             uint256 stakeAmount,
             uint256 nonce,
@@ -139,9 +173,10 @@ contract VoucherProtocolReader {
             address recoveryDelegate
         )
     {
-        VoucherProtocol.Operator memory op = protocol.getOperatorStruct(tenantId, operator);
+        VoucherTypes.Operator memory op = protocol.getOperatorStruct(tenantId, operator);
         exists = op.stakeAmount != 0 || op.isActive;
         isActive = op.isActive;
+        walletAddress = op.walletAddress == address(0) ? operator : op.walletAddress;
         metadataURI = op.metadataURI;
         stakeAmount = op.stakeAmount;
         nonce = protocol.nonces(tenantId, operator);
@@ -153,17 +188,17 @@ contract VoucherProtocolReader {
     function getDocumentStatus(bytes32 tenantId, bytes32 fileHash)
         external
         view
-        returns (VoucherProtocol.DocumentSnapshot memory)
+        returns (VoucherTypes.DocumentSnapshot memory)
     {
-        VoucherProtocol.Document memory doc = protocol.getDocument(tenantId, fileHash);
+        VoucherTypes.Document memory doc = protocol.getDocument(tenantId, fileHash);
         
         if (doc.issuer == address(0)) {
-            return VoucherProtocol.DocumentSnapshot(
+            return VoucherTypes.DocumentSnapshot(
                 false, false, address(0), "", 0, bytes32(0), bytes32(0), 0, 0, 0, 0, 0, false
             );
         }
 
-        return VoucherProtocol.DocumentSnapshot(
+        return VoucherTypes.DocumentSnapshot(
             true,
             doc.isValid,
             doc.issuer,
@@ -190,7 +225,7 @@ contract VoucherProtocolReader {
             uint256 requiredRoleMask
         )
     {
-        VoucherProtocol.CoSignPolicy memory policy = protocol.getCoSignPolicyStruct(tenantId, docType);
+        VoucherTypes.CoSignPolicy memory policy = protocol.getCoSignPolicyStruct(tenantId, docType);
         return (policy.enabled, policy.minStake, policy.minSigners, policy.requiredRoleMask);
     }
 
@@ -222,5 +257,14 @@ contract VoucherProtocolReader {
         returns (uint16 penaltyBps)
     {
         return protocol.tenantViolationPenalties(tenantId, violationCode);
+    }
+
+    function getRecoveryAliasStatus(bytes32 tenantId, address operator)
+        external
+        view
+        returns (bool hasRecoveryHistory, address rootOperator, address replacedBy)
+    {
+        (rootOperator, replacedBy) = protocol.getRecoveryAlias(tenantId, operator);
+        hasRecoveryHistory = rootOperator != address(0) || replacedBy != address(0);
     }
 }
