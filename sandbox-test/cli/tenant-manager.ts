@@ -3,7 +3,8 @@
  * Hàm đặc quyền:
  *   setOperatorStatus, recoverOperatorByAdmin,
  *   setCoSignPolicy, setCoSignOperator,
- *   setMinOperatorStake, setUnstakeCooldown, setViolationPenalty
+ *   setMinOperatorStake, setUnstakeCooldown, setViolationPenalty,
+ *   slashOperator, softSlashOperator
  */
 import { BlockchainClient } from "@verzik/sdk";
 import { BaseTestCLI } from "./base";
@@ -22,6 +23,8 @@ export class TenantManagerCLI extends BaseTestCLI {
     console.log("24. Cập nhật Stake tối thiểu");
     console.log("25. Cập nhật Cooldown Unstake");
     console.log("26. Cấu hình mức phạt vi phạm");
+    console.log("27. Hard Slash Operator (100% stake)");
+    console.log("28. Soft Slash Operator (theo violation code)");
   }
 
   protected async handleRoleChoice(choice: number): Promise<boolean> {
@@ -47,6 +50,12 @@ export class TenantManagerCLI extends BaseTestCLI {
           break;
         case 26:
           await this.handleSetViolationPenalty();
+          break;
+        case 27:
+          await this.handleSlashOperator();
+          break;
+        case 28:
+          await this.handleSoftSlashOperator();
           break;
         default:
           console.log("⚠️  Lựa chọn không hợp lệ.");
@@ -107,7 +116,7 @@ export class TenantManagerCLI extends BaseTestCLI {
       tenantId,
       Number(docType),
       enabled.trim().toLowerCase() === "true",
-      BigInt(minStake),
+      minStake,
       BigInt(minSigners),
       BigInt(requiredRoleMask),
     );
@@ -139,11 +148,34 @@ export class TenantManagerCLI extends BaseTestCLI {
       "🔹 Min Stake mới (ETH, ví dụ 0.1): ",
     );
 
-    const txHash = await this.client.setMinOperatorStake(
-      tenantId,
-      BigInt(minStake),
-    );
+    const txHash = await this.client.setMinOperatorStake(tenantId, minStake);
     console.log(`✅ Đã cập nhật Min Operator Stake! TX: ${txHash}`);
+  }
+
+  private async handleSlashOperator() {
+    const tenantId = await this.rl.question("🔹 Nhập Tenant ID (bytes32): ");
+    const operator = await this.rl.question("🔹 Địa chỉ Operator cần slash: ");
+    const reason = await this.rl.question("🔹 Lý do: ");
+
+    const txHash = await this.client.slashOperator(tenantId, operator, reason);
+    console.log(`✅ Hard Slash thành công! TX: ${txHash}`);
+  }
+
+  private async handleSoftSlashOperator() {
+    const tenantId = await this.rl.question("🔹 Nhập Tenant ID (bytes32): ");
+    const operator = await this.rl.question("🔹 Địa chỉ Operator: ");
+    const violationCode = await this.rl.question(
+      "🔹 Violation Code (bytes32): ",
+    );
+    const reason = await this.rl.question("🔹 Lý do: ");
+
+    const txHash = await this.client.softSlashOperator(
+      tenantId,
+      operator,
+      violationCode,
+      reason,
+    );
+    console.log(`✅ Soft Slash thành công! TX: ${txHash}`);
   }
 
   private async handleSetUnstakeCooldown() {

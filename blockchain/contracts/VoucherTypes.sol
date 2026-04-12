@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 library VoucherTypes {
     struct Tenant {
         address admin;
+        address operatorManager;
         address treasury;
         bool isActive;
         uint256 createdAt;

@@ -44,7 +44,6 @@ export class ProtocolAdminCLI extends BaseTestCLI {
     );
     const treasuryAddress = await this.rl.question("🔹 Địa chỉ Treasury: ");
     const adminAddress = await this.rl.question("🔹 Địa chỉ Admin: ");
-    const slasherAddress = await this.rl.question("🔹 Địa chỉ Slasher: ");
     const opManagerAddress = await this.rl.question(
       "🔹 Địa chỉ Operator Manager: ",
     );
@@ -57,7 +56,6 @@ export class ProtocolAdminCLI extends BaseTestCLI {
 
     const txHash = await this.client.createTenant(tenantName, treasuryAddress, {
       admin: adminAddress,
-      slasher: slasherAddress,
       operatorManager: opManagerAddress,
       minStake: minStakeEth,
       unstakeCooldown: BigInt(cooldownSec),

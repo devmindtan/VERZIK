@@ -14,13 +14,16 @@ Dự án tuân thủ tiêu chuẩn [Semantic Versioning](https://semver.org/).
   - [\[Unreleased\]](#unreleased)
     - [Changed](#changed)
     - [Added](#added)
-  - [\[1.0.1-alpha\] - 2026-04-12](#101-alpha---2026-04-12)
-    - [Security](#security)
+  - [\[1.0.2-alpha\] - 2026-04-12](#102-alpha---2026-04-12)
     - [Changed](#changed-1)
     - [Added](#added-1)
-  - [\[1.0.0-alpha\] - 2026-04-09](#100-alpha---2026-04-09)
+  - [\[1.0.1-alpha\] - 2026-04-12](#101-alpha---2026-04-12)
+    - [Security](#security)
     - [Changed](#changed-2)
     - [Added](#added-2)
+  - [\[1.0.0-alpha\] - 2026-04-09](#100-alpha---2026-04-09)
+    - [Changed](#changed-3)
+    - [Added](#added-3)
 
 ---
 
@@ -64,7 +67,39 @@ Dự án tuân thủ tiêu chuẩn [Semantic Versioning](https://semver.org/).
   - Cần thêm test cho toàn bộ các trường hợp Protocol Admin không được trở thành tenant hoặc operator theo mọi đường đi trực tiếp và gián tiếp.
   - Bao gồm các case qua create tenant, update treasury, recovery delegate, recovery by admin, operator onboarding, ký tài liệu và co-sign.
 
+- **Bổ sung khả năng truy vết giao dịch trong bộ công cụ test sandbox:**
+  - Cho phép xem nhanh thông tin transaction lifecycle và event decode ngay từ CLI mà không cần mở explorer ngoài.
+
 ---
+
+## [1.0.2-alpha] - 2026-04-12
+
+### Changed
+
+- **Cải thiện hiển thị dữ liệu trong sandbox CLI (tất cả hàm view):**
+  - Thay thế toàn bộ `console.log(object)` thô bằng output có nhãn, định dạng rõ ràng.
+  - Các giá trị ETH (stake, minStake, minOperatorStake) được hiển thị trực tiếp dưới dạng chuỗi `X.X ETH` — xử lý tại tầng SDK, CLI không cần import ethers.
+  - Timestamp (createdAt, unstakeReadyAt) được format sang giờ địa phương vi-VN.
+  - Boolean được hiển thị bằng ký hiệu ✅/❌ thay vì `true`/`false`.
+  - Địa chỉ zero (`0x000...000`) trong recovery delegate được thay bằng `—`.
+  - `unstakeCooldown` hiển thị cả giây lẫn số giờ quy đổi.
+  - `violationPenalty` hiển thị cả BPS lẫn phần trăm.
+
+- **Đồng bộ tầng SDK: chuyển các trường ETH từ `bigint` sang `string` đã định dạng:**
+  - `OperatorStatus.stakeAmount` → `"X.X ETH"`
+  - `CoSignStatus.minStake` → `"X.X ETH"`
+  - `getCoSignPolicy()` return `minStake` → `"X.X ETH"`
+  - `getTenantRuntimeConfig()` return `minOperatorStake` → `"X.X ETH"`
+
+### Added
+
+- **Bổ sung trường `operatorManager` vào thông tin Tenant:**
+  - Thêm `address operatorManager` vào struct `VoucherTypes.Tenant` (lưu trữ on-chain).
+  - `VoucherProtocol.createTenant` lưu `config.operatorManager` vào struct khi khởi tạo.
+  - `VoucherProtocolReader.getTenantInfo` trả thêm `operatorManager` trong tuple output.
+  - ABI, SDK `TenantInfo` interface và `getTenantInfo()` đều được cập nhật đồng bộ.
+  - CLI sandbox hiển thị đầy đủ 3 địa chỉ governance: Admin, Op.Manager, Treasury.
+  - **Lưu ý:** cần redeploy contract để áp dụng thay đổi struct.
 
 ## [1.0.1-alpha] - 2026-04-12
 
@@ -83,6 +118,17 @@ Dự án tuân thủ tiêu chuẩn [Semantic Versioning](https://semver.org/).
   - Đã đồng bộ lại tài liệu mô tả hàm để tránh hiểu nhầm giữa khái niệm `protocolOwner` và quyền vận hành thực tế của Protocol Admin.
 
 ### Changed
+
+- **Đã đồng bộ lại tài liệu chức năng theo kiến trúc core mới (thin orchestrator + external libraries):**
+  - Cập nhật phần mở đầu và danh sách hàm trong tài liệu để khớp với mô hình `VoucherProtocol` + `OperatorLib` + `DocumentLib` + `CoSignLib` + `RecoveryLib`.
+  - Làm rõ mô hình governance hiện tại: `admin`, `operatorManager`, `treasury` (không còn slasher role tách riêng trong logic vận hành).
+
+- **Đã cập nhật sandbox CLI để hỗ trợ debug giao dịch tốt hơn:**
+  - Bổ sung menu read-only tra cứu lịch sử giao dịch theo transaction hash.
+  - Kết quả trả về gồm transaction, receipt, block, confirmations và dữ liệu decode input/logs.
+
+- **Đã đồng bộ input cho luồng cấu hình Co-Sign Policy trong CLI tenant manager:**
+  - `minStake` được truyền đúng kiểu chuỗi ETH để SDK tự `parseEther`, tránh lệch kiểu dữ liệu khi gọi hàm.
 
 - **Đã làm rõ semantics khi Tenant bị inactive theo hướng đóng băng lifecycle operator:**
   - Khi tenant inactive, các hàm sau sẽ `revert TenantInactive`:

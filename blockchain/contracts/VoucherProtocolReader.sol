@@ -113,6 +113,7 @@ contract VoucherProtocolReader {
         returns (
             bool exists,
             address admin,
+            address operatorManager,
             address treasury,
             bool isActive,
             uint256 createdAt
@@ -121,6 +122,7 @@ contract VoucherProtocolReader {
         VoucherTypes.Tenant memory tenant = protocol.getTenantStruct(tenantId);
         exists = tenant.admin != address(0);
         admin = tenant.admin;
+        operatorManager = tenant.operatorManager;
         treasury = tenant.treasury;
         isActive = tenant.isActive;
         createdAt = tenant.createdAt;

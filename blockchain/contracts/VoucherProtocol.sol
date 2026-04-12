@@ -78,6 +78,7 @@ contract VoucherProtocol is ReentrancyGuard, AccessControl, IVoucherProtocolErro
 
         _s.tenants[tenantId] = VoucherTypes.Tenant({
             admin: config.admin,
+            operatorManager: config.operatorManager,
             treasury: tenantTreasury,
             isActive: true,
             createdAt: block.timestamp
