@@ -1,0 +1,304 @@
+type CoSignOperatorConfigured @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  docType: BigInt! # uint32
+  operator: Bytes! # address
+  whitelisted: Boolean! # bool
+  roleId: Int! # uint16
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type CoSignPolicyUpdated @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  docType: BigInt! # uint32
+  enabled: Boolean! # bool
+  minStake: BigInt! # uint256
+  minSigners: BigInt! # uint256
+  requiredRoleMask: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DocumentAnchored @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  fileHash: Bytes! # bytes32
+  cid: String! # string
+  issuer: Bytes! # address
+  ciphertextHash: Bytes! # bytes32
+  encryptionMetaHash: Bytes! # bytes32
+  docType: BigInt! # uint32
+  version: BigInt! # uint32
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DocumentCoSignQualified @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  fileHash: Bytes! # bytes32
+  trustedSigners: BigInt! # uint256
+  roleMask: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DocumentCoSigned @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  fileHash: Bytes! # bytes32
+  signer: Bytes! # address
+  totalSigners: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DocumentRevoked @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  fileHash: Bytes! # bytes32
+  revoker: Bytes! # address
+  reason: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type MinOperatorStakeUpdated @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  oldValue: BigInt! # uint256
+  newValue: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type NonceConsumed @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  signer: Bytes! # address
+  oldNonce: BigInt! # uint256
+  newNonce: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorJoined @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  operator: Bytes! # address
+  metadata: String! # string
+  stake: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorMetadataUpdated @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  operator: Bytes! # address
+  metadataURI: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorRecovered @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  oldOperator: Bytes! # address
+  newOperator: Bytes! # address
+  stakeAmount: BigInt! # uint256
+  reason: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorRecoveryAliasUpdated @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  oldOperator: Bytes! # address
+  newOperator: Bytes! # address
+  rootOperator: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorRecoveryDelegateUpdated @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  operator: Bytes! # address
+  delegate: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorSlashed @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  operator: Bytes! # address
+  amount: BigInt! # uint256
+  slasher: Bytes! # address
+  reason: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorSoftSlashed @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  operator: Bytes! # address
+  violationCode: Bytes! # bytes32
+  penaltyBps: Int! # uint16
+  slashedAmount: BigInt! # uint256
+  remainingStake: BigInt! # uint256
+  slasher: Bytes! # address
+  reason: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorStakeToppedUp @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  operator: Bytes! # address
+  amount: BigInt! # uint256
+  totalStake: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorStatusUpdated @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  operator: Bytes! # address
+  isActive: Boolean! # bool
+  reason: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorUnstakeRequested @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  operator: Bytes! # address
+  availableAt: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorUnstaked @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  operator: Bytes! # address
+  amount: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type ProtocolInitialized @entity(immutable: true) {
+  id: Bytes!
+  protocolOwner: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type RoleAdminChanged @entity(immutable: true) {
+  id: Bytes!
+  role: Bytes! # bytes32
+  previousAdminRole: Bytes! # bytes32
+  newAdminRole: Bytes! # bytes32
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type RoleGranted @entity(immutable: true) {
+  id: Bytes!
+  role: Bytes! # bytes32
+  account: Bytes! # address
+  sender: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type RoleRevoked @entity(immutable: true) {
+  id: Bytes!
+  role: Bytes! # bytes32
+  account: Bytes! # address
+  sender: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TenantCreated @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  admin: Bytes! # address
+  treasury: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TenantStatusUpdated @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  isActive: Boolean! # bool
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TreasuryUpdated @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  oldTreasury: Bytes! # address
+  newTreasury: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type UnstakeCooldownUpdated @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  oldValue: BigInt! # uint256
+  newValue: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type ViolationPenaltyUpdated @entity(immutable: true) {
+  id: Bytes!
+  tenantId: Bytes! # bytes32
+  violationCode: Bytes! # bytes32
+  oldPenaltyBps: Int! # uint16
+  newPenaltyBps: Int! # uint16
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
