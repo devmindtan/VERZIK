@@ -75,6 +75,7 @@ interface IVoucherProtocolErrorsEvents {
     event DocumentAnchored(
         bytes32 indexed tenantId,
         bytes32 indexed fileHash,
+        address owner,
         string cid,
         address indexed issuer,
         bytes32 ciphertextHash,

@@ -2,7 +2,7 @@ import express, { Request, Response } from "express";
 import dotenv from "dotenv";
 import path from "path";
 import cors from "cors";
-import documentAnchoredsApi from "./routes/blockchain.query.api";
+import blockchainQueryApi from "./routes/blockchain.query.api";
 import checkPermissionApi from "./routes/blockchain.permission.api";
 
 dotenv.config();
@@ -33,7 +33,7 @@ app.get("/", (req: Request, res: Response) => {
   res.send("Hello");
 });
 
-app.use("/api", documentAnchoredsApi);
+app.use("/api", blockchainQueryApi);
 app.use("/api", checkPermissionApi);
 
 const startServer = () => {

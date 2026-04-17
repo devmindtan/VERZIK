@@ -179,6 +179,12 @@
       },
       {
         "indexed": false,
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "indexed": false,
         "internalType": "string",
         "name": "cid",
         "type": "string"
@@ -1409,6 +1415,7 @@
         "components": [
           { "internalType": "bytes32", "name": "tenantId", "type": "bytes32" },
           { "internalType": "bytes32", "name": "fileHash", "type": "bytes32" },
+          { "internalType": "address", "name": "owner", "type": "address" },
           { "internalType": "string", "name": "cid", "type": "string" },
           {
             "internalType": "bytes32",

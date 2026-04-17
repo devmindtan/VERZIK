@@ -27,6 +27,7 @@ type DocumentAnchored @entity(immutable: true) {
   id: Bytes!
   tenantId: Bytes! # bytes32
   fileHash: Bytes! # bytes32
+  owner: Bytes! # address
   cid: String! # string
   issuer: Bytes! # address
   ciphertextHash: Bytes! # bytes32

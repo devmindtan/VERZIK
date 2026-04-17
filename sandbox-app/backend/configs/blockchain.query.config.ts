@@ -31,6 +31,10 @@ export class BlockchainQueryClient {
   async getDirectQuery() {
     return this.directQuery;
   }
+  async getCustomQuery(query: string, variables?: Record<string, unknown>) {
+    return this.graphQuery.query(query, variables);
+  }
+
   /**
    * Chạy các hàm query dựa trên danh sách tên truyền vào
    * @param getSelectedQueries Mảng tên hàm (ví dụ: ['getTenantCreateds', 'getDocumentAnchoreds'])

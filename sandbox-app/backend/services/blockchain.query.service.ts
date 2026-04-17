@@ -55,6 +55,46 @@ export class BlockchainQueryService {
     }
   }
 
+  async getAllTenantInfoById(tenantId: string) {
+    try {
+      const query = `
+        query GetFullTenantHistory($tenantId: String!) {
+          tenantCreateds(where: { tenantId: $tenantId }, first: 1) {
+            admin
+            manager
+            treasury
+            blockTimestamp
+            transactionHash
+          }
+          tenantStatusUpdateds(where: { tenantId: $tenantId }, orderBy: blockTimestamp, orderDirection: desc) {
+            isActive
+            blockTimestamp
+            transactionHash
+          }
+          minOperatorStakeUpdateds(where: { tenantId: $tenantId }, orderBy: blockTimestamp, orderDirection: desc) {
+            oldValue
+            newValue
+            blockTimestamp
+            transactionHash
+          }
+          unstakeCooldownUpdateds(where: { tenantId: $tenantId }, orderBy: blockTimestamp, orderDirection: desc) {
+            oldValue
+            newValue
+            blockTimestamp
+            transactionHash
+          }
+        }
+      `;
+
+      const variables = { tenantId };
+      const data = await this.queryClient.getCustomQuery(query, variables);
+      return data;
+    } catch (error) {
+      console.error("Service Error [GetAllTenantInfoById]:", error);
+      return [];
+    }
+  }
+
   async getOperatorJoineds(first?: number): Promise<DocumentAnchoredResponse> {
     try {
       const data = await this.queryClient.getSelectedQueries(

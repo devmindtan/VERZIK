@@ -104,6 +104,7 @@ export function handleDocumentAnchored(event: DocumentAnchoredEvent): void {
   )
   entity.tenantId = event.params.tenantId
   entity.fileHash = event.params.fileHash
+  entity.owner = event.params.owner
   entity.cid = event.params.cid
   entity.issuer = event.params.issuer
   entity.ciphertextHash = event.params.ciphertextHash

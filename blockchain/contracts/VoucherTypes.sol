@@ -33,6 +33,7 @@ library VoucherTypes {
     struct RegisterPayload {
         bytes32 tenantId;
         bytes32 fileHash;
+        address owner;
         string cid;
         bytes32 ciphertextHash;
         bytes32 encryptionMetaHash;

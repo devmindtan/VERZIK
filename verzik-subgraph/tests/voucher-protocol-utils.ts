@@ -120,6 +120,7 @@ export function createCoSignPolicyUpdatedEvent(
 export function createDocumentAnchoredEvent(
   tenantId: Bytes,
   fileHash: Bytes,
+  owner: Address,
   cid: string,
   issuer: Address,
   ciphertextHash: Bytes,
@@ -136,6 +137,9 @@ export function createDocumentAnchoredEvent(
   )
   documentAnchoredEvent.parameters.push(
     new ethereum.EventParam("fileHash", ethereum.Value.fromFixedBytes(fileHash))
+  )
+  documentAnchoredEvent.parameters.push(
+    new ethereum.EventParam("owner", ethereum.Value.fromAddress(owner))
   )
   documentAnchoredEvent.parameters.push(
     new ethereum.EventParam("cid", ethereum.Value.fromString(cid))

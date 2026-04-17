@@ -152,7 +152,7 @@ library DocumentLib {
             payload.tenantId, signer, payload.nonce, payload.nonce + 1
         );
         emit IVoucherProtocolErrorsEvents.DocumentAnchored(
-            payload.tenantId, payload.fileHash, payload.cid, signer,
+            payload.tenantId, payload.fileHash, payload.owner, payload.cid, signer,
             payload.ciphertextHash, payload.encryptionMetaHash, payload.docType, payload.version
         );
         emit IVoucherProtocolErrorsEvents.DocumentCoSigned(payload.tenantId, payload.fileHash, signer, 1);

@@ -78,3 +78,22 @@ export async function handleGetTenantCount(req: Request, res: Response) {
     });
   }
 }
+
+export async function handleGetAllTenantInfoById(req: Request, res: Response) {
+  try {
+    const { tenantId } = req.query;
+
+    const result = await queryService.getAllTenantInfoById(tenantId as string);
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error("Controller Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+}
