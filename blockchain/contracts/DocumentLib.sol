@@ -17,7 +17,7 @@ library DocumentLib {
 
     bytes32 private constant PROTOCOL_ADMIN_ROLE = keccak256("PROTOCOL_ADMIN_ROLE");
     bytes32 private constant REGISTER_TYPEHASH = keccak256(
-        "Register(bytes32 tenantId,bytes32 fileHash,string cid,bytes32 ciphertextHash,bytes32 encryptionMetaHash,uint32 docType,uint32 version,uint256 nonce,uint256 deadline)"
+        "Register(bytes32 tenantId,bytes32 fileHash,address owner,string cid,bytes32 ciphertextHash,bytes32 encryptionMetaHash,uint32 docType,uint32 version,uint256 nonce,uint256 deadline)"
     );
     uint16 private constant MIN_COSIGN_ROLE_ID = 1;
     uint16 private constant MAX_COSIGN_ROLE_ID = 256;
@@ -50,6 +50,7 @@ library DocumentLib {
             REGISTER_TYPEHASH,
             payload.tenantId,
             payload.fileHash,
+            payload.owner,
             keccak256(bytes(payload.cid)),
             payload.ciphertextHash,
             payload.encryptionMetaHash,
@@ -119,6 +120,7 @@ library DocumentLib {
         $.documents[payload.tenantId][payload.fileHash] = VoucherTypes.Document({
             tenantId: payload.tenantId,
             cid: payload.cid,
+            owner: payload.owner,
             issuer: signer,
             timestamp: block.timestamp,
             isValid: true,

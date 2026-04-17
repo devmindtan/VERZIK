@@ -8,9 +8,9 @@ dataSources:
     name: VoucherProtocol
     network: mainnet
     source:
-      address: "0x46b142DD1E924FAb83eCc3c08e4D46E82f005e0E"
+      address: "0x4631BCAbD6dF18D94796344963cB60d44a4136b6"
       abi: VoucherProtocol
-      startBlock: 128
+      startBlock: 136
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9

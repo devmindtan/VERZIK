@@ -1149,6 +1149,7 @@
         "components": [
           { "internalType": "bytes32", "name": "tenantId", "type": "bytes32" },
           { "internalType": "string", "name": "cid", "type": "string" },
+          { "internalType": "address", "name": "owner", "type": "address" },
           { "internalType": "address", "name": "issuer", "type": "address" },
           { "internalType": "uint256", "name": "timestamp", "type": "uint256" },
           { "internalType": "bool", "name": "isValid", "type": "bool" },

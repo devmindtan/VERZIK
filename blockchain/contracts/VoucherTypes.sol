@@ -21,6 +21,7 @@ library VoucherTypes {
     struct Document {
         bytes32 tenantId;
         string cid;
+        address owner;
         address issuer;
         uint256 timestamp;
         bool isValid;
