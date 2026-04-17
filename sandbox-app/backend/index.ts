@@ -3,6 +3,8 @@ import dotenv from "dotenv";
 import path from "path";
 import cors from "cors";
 import documentAnchoredsApi from "./routes/blockchain.query.api";
+import checkPermissionApi from "./routes/blockchain.permission.api";
+
 dotenv.config();
 
 const app = express();
@@ -32,6 +34,7 @@ app.get("/", (req: Request, res: Response) => {
 });
 
 app.use("/api", documentAnchoredsApi);
+app.use("/api", checkPermissionApi);
 
 const startServer = () => {
   try {

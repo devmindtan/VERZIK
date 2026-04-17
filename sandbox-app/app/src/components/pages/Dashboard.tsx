@@ -17,9 +17,9 @@ import {
   SealCheckIcon,
 } from "@phosphor-icons/react";
 import { WalletSession } from "../access";
-import type { TenantInfo, OperatorStatus } from "../../utils/types";
-import { shortAddress, shortBytes32 } from "../../utils/display";
+import { shortBytes32 } from "../../utils/display";
 import { useState, useEffect } from "react";
+import type { DataResponseWithTotal } from "../../services/blockchain.query.service";
 interface StatCardProps {
   label: string;
   value: string;
@@ -27,7 +27,11 @@ interface StatCardProps {
   color: string;
   sub?: string;
 }
-import { fetchDocumentAnchoreds } from "../../services/blockchain.query.service";
+import {
+  fetchDocumentAnchoreds,
+  fetchOperatorJoineds,
+  fetchTenantCount,
+} from "../../services/blockchain.query.service";
 
 function StatCard({ label, value, icon, color, sub }: StatCardProps) {
   return (
@@ -60,34 +64,47 @@ const STATUS_COLOR: Record<string, string> = {
   PENDING: "yellow",
 };
 
-export function Dashboard({
-  session,
-  tenants,
-  operators,
-  balanceEth,
-  networkName,
-}: {
-  session: WalletSession;
-  tenants: TenantInfo[];
-  operators: OperatorStatus[];
-  balanceEth: string;
-  networkName: string;
-}) {
-  const [documentAnchoreds, setDocumentAnchoreds] = useState<any[]>([]);
+export function Dashboard({ session }: { session: WalletSession }) {
+  const [documentAnchoreds, setDocumentAnchoreds] =
+    useState<DataResponseWithTotal | null>(null);
+  const [tenantCount, setTenantCount] = useState(0);
+  const [operatorJoineds, setOperatorJoineds] =
+    useState<DataResponseWithTotal | null>(null);
   useEffect(() => {
     const handleFetchDocumentAnchoreds = async () => {
       try {
-        console.log("🚀 Đang gọi API test...");
+        // console.log("Đang gọi API test...");
         const data = await fetchDocumentAnchoreds();
 
-        console.log("✅ Dữ liệu lưu vào state:", data?.data);
-        setDocumentAnchoreds(data?.data);
+        // console.log("Dữ liệu lưu vào state:", data);
+        const result = data?.data;
+        setDocumentAnchoreds(result ?? null);
+      } catch (error) {
+        console.error("Lỗi fetch:", error);
+      }
+    };
+    const handleFetchTenantCount = async () => {
+      try {
+        const data = await fetchTenantCount();
+        const total = data?.data;
+        setTenantCount(Number(total));
+      } catch (error) {
+        console.error("Lỗi fetch:", error);
+      }
+    };
+    const handleFetchOperatorJoineds = async () => {
+      try {
+        const data = await fetchOperatorJoineds();
+        const result = data?.data;
+        setOperatorJoineds(result ?? null);
       } catch (error) {
         console.error("Lỗi fetch:", error);
       }
     };
 
     handleFetchDocumentAnchoreds();
+    handleFetchTenantCount();
+    handleFetchOperatorJoineds();
   }, []);
 
   const title =
@@ -103,48 +120,38 @@ export function Dashboard({
 
       <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
         <StatCard
-          label={
-            session.primaryRole === "owner" ? "Tổng Tenants" : "Tenant scope"
-          }
-          value={
-            session.primaryRole === "owner"
-              ? String(tenants.length)
-              : `#${shortBytes32(session.tenantId)}`
-          }
+          label="Tổng Tenants"
+          value={String(tenantCount || "-")}
           icon={<BuildingsIcon size={22} />}
-          color="blue"
-          sub={
-            session.primaryRole === "owner"
-              ? "3 đang hoạt động"
-              : getRoleSub(session)
-          }
+          color="teal"
+          sub="Dữ liệu từ reader"
         />
         <StatCard
           label="Tổng Operators"
-          value={String(operators.length)}
+          value={String(operatorJoineds?.total || "-")}
           icon={<UsersThreeIcon size={22} />}
           color="teal"
-          sub="Dữ liệu từ SDK reader"
+          sub="Dữ liệu từ graph"
         />
         <StatCard
-          label="Số dư ví"
-          value={balanceEth}
+          label="Tổng tài liệu"
+          value={String(documentAnchoreds?.total || "-")}
           icon={<FileTextIcon size={22} />}
           color="violet"
-          sub="ETH"
+          sub="Đã/chưa đủ tiêu chuẩn"
         />
         <StatCard
-          label="Mạng kết nối"
-          value={networkName}
+          label="Tài liệu đủ tiêu chuẩn"
+          value={String(tenantCount || "-")}
           icon={<SealCheckIcon size={22} />}
           color="orange"
-          sub="RPC hiện tại"
+          sub="Đã đủ tiêu chuẩn"
         />
       </SimpleGrid>
 
       <Grid>
         {/* Recent documents */}
-        <Grid.Col span={{ base: 12, md: 8 }}>
+        <Grid.Col span={{ base: 12, md: 12 }}>
           <Card withBorder radius="md" padding="md">
             <Text fw={600} mb="md">
               Tài liệu gần đây
@@ -160,7 +167,7 @@ export function Dashboard({
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {documentAnchoreds?.map((doc: any) => (
+                {documentAnchoreds?.data.map((doc: any) => (
                   <Table.Tr key={doc.id}>
                     <Table.Td>
                       <Text size="sm" ff="monospace">
@@ -192,7 +199,7 @@ export function Dashboard({
                 ))}
 
                 {/* Xử lý trường hợp mảng rỗng */}
-                {documentAnchoreds?.length === 0 && (
+                {documentAnchoreds?.total === 0 && (
                   <Table.Tr>
                     <Table.Td colSpan={5} align="center" py="xl">
                       <Text size="sm" c="dimmed">
@@ -205,40 +212,7 @@ export function Dashboard({
             </Table>
           </Card>
         </Grid.Col>
-
-        {/* Network status */}
-        <Grid.Col span={{ base: 12, md: 4 }}>
-          <Card withBorder radius="md" padding="md" h="100%">
-            <Text fw={600} mb="md">
-              Trạng thái mạng
-            </Text>
-            <Stack gap="sm">
-              {[
-                { label: "Network", value: networkName },
-                { label: "Địa chỉ ví", value: shortAddress(session.address) },
-                { label: "Vai trò", value: getRoleSub(session) },
-                { label: "Tenant loaded", value: String(tenants.length) },
-                { label: "Operator loaded", value: String(operators.length) },
-              ].map(({ label, value }) => (
-                <Group key={label} justify="space-between">
-                  <Text size="sm" c="dimmed">
-                    {label}
-                  </Text>
-                  <Text size="sm" fw={500} ff="monospace">
-                    {value}
-                  </Text>
-                </Group>
-              ))}
-            </Stack>
-          </Card>
-        </Grid.Col>
       </Grid>
     </Stack>
   );
-}
-
-function getRoleSub(session: WalletSession) {
-  if (session.primaryRole === "operator") return shortAddress(session.address);
-  if (session.primaryRole === "tenant") return `Vai trò: ${session.tenantRole}`;
-  return "3 đang hoạt động";
 }

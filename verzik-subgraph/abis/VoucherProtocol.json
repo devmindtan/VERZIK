@@ -825,6 +825,12 @@
       {
         "indexed": true,
         "internalType": "address",
+        "name": "manager",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
         "name": "treasury",
         "type": "address"
       }
@@ -1039,7 +1045,6 @@
       {
         "components": [
           { "internalType": "address", "name": "admin", "type": "address" },
-          { "internalType": "address", "name": "slasher", "type": "address" },
           {
             "internalType": "address",
             "name": "operatorManager",

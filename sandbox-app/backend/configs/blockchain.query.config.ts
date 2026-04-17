@@ -1,31 +1,47 @@
-import { GraphQueryClient, createGraphQueryClient } from "@verzik/sdk";
-
+import {
+  GraphQueryClient,
+  createGraphQueryClient,
+  DirectQueryClient,
+  createDirectQueryClient,
+} from "@verzik/sdk";
+import dotenv from "dotenv";
+dotenv.config();
 type ClientMethod = (...args: unknown[]) => Promise<unknown>;
 
-export class BlockchainGraphQueryClient {
-  protected client: GraphQueryClient;
+export class BlockchainQueryClient {
+  protected graphQuery: GraphQueryClient;
+  protected directQuery: DirectQueryClient;
 
   constructor() {
-    this.client = createGraphQueryClient({
-      endpoint: "http://100.114.63.52:30800/subgraphs/name/verzik-subgraph",
+    this.graphQuery = createGraphQueryClient({
+      endpoint: process.env.GRAPH_NODE_URL || "",
+    });
+    this.directQuery = createDirectQueryClient({
+      rpcUrl: process.env.RPC_URL || "",
+      protocolAddress: process.env.PROTOCOL_ADDRESS || "",
+      readerAddress: process.env.READER_ADDRESS || "",
     });
   }
   private getClientMethodNames(): string[] {
-    return Object.getOwnPropertyNames(Object.getPrototypeOf(this.client))
+    return Object.getOwnPropertyNames(Object.getPrototypeOf(this.graphQuery))
       .filter((name) => name !== "constructor" && name.startsWith("get"))
       .sort((left, right) => left.localeCompare(right));
   }
 
+  async getDirectQuery() {
+    return this.directQuery;
+  }
   /**
    * Chạy các hàm query dựa trên danh sách tên truyền vào
-   * @param methodsToRun Mảng tên hàm (ví dụ: ['getTenantCreateds', 'getDocumentAnchoreds'])
+   * @param getSelectedQueries Mảng tên hàm (ví dụ: ['getTenantCreateds', 'getDocumentAnchoreds'])
    */
   async getSelectedQueries(
     methodsToRun: string[],
-    first: number,
+    param?: number | string,
   ): Promise<Record<string, unknown>> {
     const results: Record<string, unknown> = {};
     const availableMethods = this.getClientMethodNames();
+    // console.log(availableMethods);
     const targetMethods =
       methodsToRun.length > 0
         ? methodsToRun.filter((name) => availableMethods.includes(name))
@@ -33,7 +49,7 @@ export class BlockchainGraphQueryClient {
 
     await Promise.all(
       targetMethods.map(async (methodName) => {
-        const clientRecord = this.client as unknown as Record<
+        const clientRecord = this.graphQuery as unknown as Record<
           string,
           ClientMethod
         >;
@@ -47,7 +63,7 @@ export class BlockchainGraphQueryClient {
           }
 
           if (isListQuery) {
-            results[methodName] = await method.apply(this.client, [first]);
+            results[methodName] = await method.apply(this.graphQuery, [param]);
           }
         } catch (error) {
           console.error(`Lỗi khi lấy dữ liệu từ ${methodName}:`, error);
@@ -61,7 +77,10 @@ export class BlockchainGraphQueryClient {
 }
 // async function main() {
 //   const test = new BlockchainGraphQueryClient();
-//   const result = await test.getSelectedQueries(["getDocumentAnchoreds"], 10);
+//   const result = await test.getSelectedQueries(
+//     ["getTenantsByUsers"],
+//     "0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc",
+//   );
 //   console.log(result);
 // }
 // main();

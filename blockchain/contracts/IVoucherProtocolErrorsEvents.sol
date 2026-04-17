@@ -43,7 +43,7 @@ interface IVoucherProtocolErrorsEvents {
     event TenantCreated(
         bytes32 indexed tenantId, 
         address indexed admin, 
-        address indexed manager, 
+        address indexed manager,
         address treasury
     );
     

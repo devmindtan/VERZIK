@@ -1,14 +1,5 @@
-export interface DocumentAnchored {
-  id: string;
-  tenantId: string;
-  fileHash: string;
-  cid: string;
-  issuer: string;
-  ciphertextHash: string;
-  encryptionMetaHash: string;
-  docType: string;
-  version: string;
-  blockNumber: string;
-  blockTimestamp: string;
-  transactionHash: string;
+import type { DocumentAnchored } from "@verzik/sdk";
+export interface DocumentAnchoredResponse {
+  data: DocumentAnchored[];
+  total: number;
 }

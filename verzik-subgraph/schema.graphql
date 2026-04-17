@@ -257,6 +257,7 @@ type TenantCreated @entity(immutable: true) {
   id: Bytes!
   tenantId: Bytes! # bytes32
   admin: Bytes! # address
+  manager: Bytes! # address
   treasury: Bytes! # address
   blockNumber: BigInt!
   blockTimestamp: BigInt!

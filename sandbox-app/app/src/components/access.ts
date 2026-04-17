@@ -109,7 +109,7 @@ export function getRoleLabel(session: WalletSession) {
 }
 
 export function getVisiblePages(session: WalletSession): Page[] {
-  if (session.primaryRole === "guest") return [];
+  if (session.primaryRole === "guest") return ["dashboard"];
   return [
     "dashboard",
     "tenants",

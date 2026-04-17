@@ -751,6 +751,7 @@ export function createRoleRevokedEvent(
 export function createTenantCreatedEvent(
   tenantId: Bytes,
   admin: Address,
+  manager: Address,
   treasury: Address
 ): TenantCreated {
   let tenantCreatedEvent = changetype<TenantCreated>(newMockEvent())
@@ -762,6 +763,9 @@ export function createTenantCreatedEvent(
   )
   tenantCreatedEvent.parameters.push(
     new ethereum.EventParam("admin", ethereum.Value.fromAddress(admin))
+  )
+  tenantCreatedEvent.parameters.push(
+    new ethereum.EventParam("manager", ethereum.Value.fromAddress(manager))
   )
   tenantCreatedEvent.parameters.push(
     new ethereum.EventParam("treasury", ethereum.Value.fromAddress(treasury))

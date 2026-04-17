@@ -1,8 +1,8 @@
 {
-  "sepolia": {
+  "mainnet": {
     "VoucherProtocol": {
-      "address": "0x5081a39b8A5f0E35a8D959395a630b68B74Dd30f",
-      "startBlock": 0
+      "address": "0xf4B146FbA71F41E0592668ffbF264F1D186b2Ca8",
+      "startBlock": 119
     }
   }
 }

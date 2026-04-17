@@ -459,6 +459,7 @@ export function handleTenantCreated(event: TenantCreatedEvent): void {
   )
   entity.tenantId = event.params.tenantId
   entity.admin = event.params.admin
+  entity.manager = event.params.manager
   entity.treasury = event.params.treasury
 
   entity.blockNumber = event.block.number

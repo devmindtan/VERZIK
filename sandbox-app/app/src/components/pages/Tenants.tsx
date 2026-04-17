@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Stack,
   Title,
@@ -23,12 +23,37 @@ import {
 } from "@phosphor-icons/react";
 import type { TenantInfo } from "../../utils/types";
 import { shortAddress, shortBytes32 } from "../../utils/display";
-
-const STATUS_COLOR: Record<string, string> = {
-  ACTIVE: "teal",
-  SUSPENDED: "red",
-  PENDING: "yellow",
+import { fetchTenantCreateds } from "../../services/blockchain.query.service";
+type TenantTableRow = {
+  id: string;
+  tenantId: string;
+  admin: string;
+  manager: string;
+  treasury: string;
+  blockTimestamp: string;
+  isActive?: boolean;
 };
+
+function mapTenantRow(input: Record<string, unknown>): TenantTableRow {
+  const id = String(input.id ?? "");
+  const tenantId = String(input.tenantId ?? input.id ?? "");
+  const admin = String(input.admin ?? "");
+  const manager = String(input.manager ?? input.operatorManager ?? "");
+  const treasury = String(input.treasury ?? "");
+  const blockTimestamp = String(input.blockTimestamp ?? input.createdAt ?? "0");
+  const isActive =
+    typeof input.isActive === "boolean" ? input.isActive : undefined;
+
+  return {
+    id,
+    tenantId,
+    admin,
+    manager,
+    treasury,
+    blockTimestamp,
+    isActive,
+  };
+}
 
 function CreateTenantModal({
   opened,
@@ -84,19 +109,20 @@ function TenantDetailModal({
   canEditTenantConfig,
   canSetTenantStatus,
 }: {
-  tenant: TenantInfo | null;
+  tenant: TenantTableRow | null;
   opened: boolean;
   onClose: () => void;
   canEditTenantConfig: boolean;
   canSetTenantStatus: boolean;
 }) {
   if (!tenant) return null;
+
   return (
     <Modal
       opened={opened}
       onClose={onClose}
       title={`Chi tiết Tenant: ${shortBytes32(tenant.id)}`}
-      size="lg"
+      size="xl"
     >
       <Tabs defaultValue="info">
         <Tabs.List mb="md">
@@ -110,15 +136,22 @@ function TenantDetailModal({
         <Tabs.Panel value="info">
           <Stack gap="sm">
             {[
-              ["Tenant ID", shortBytes32(tenant.id)],
-              ["Tên", shortBytes32(tenant.id)],
-              ["Trạng thái", tenant.isActive ? "ACTIVE" : "SUSPENDED"],
-              ["Admin", shortAddress(tenant.admin)],
-              ["Operator Manager", shortAddress(tenant.operatorManager)],
-              ["Treasury", shortAddress(tenant.treasury)],
+              ["Event ID", tenant.id],
+              ["Tenant ID", tenant.tenantId],
+              [
+                "Trạng thái",
+                tenant.isActive === undefined
+                  ? "UNKNOWN"
+                  : tenant.isActive
+                    ? "ACTIVE"
+                    : "SUSPENDED",
+              ],
+              ["Admin", tenant.admin],
+              ["Operator Manager", tenant.manager],
+              ["Treasury", tenant.treasury],
               [
                 "Ngày tạo",
-                new Date(Number(tenant.createdAt) * 1000).toLocaleString(),
+                new Date(Number(tenant.blockTimestamp) * 1000).toLocaleString(),
               ],
             ].map(([k, v]) => (
               <Group key={k} justify="space-between">
@@ -180,10 +213,52 @@ export function Tenants({
   canSetTenantStatus: boolean;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
-  const [detail, setDetail] = useState<TenantInfo | null>(null);
+  const [detail, setDetail] = useState<TenantTableRow | null>(null);
+  const [tenantRows, setTenantRows] = useState<TenantTableRow[]>([]);
+
+  useEffect(() => {
+    const loadTenantRows = async () => {
+      try {
+        const response = await fetchTenantCreateds();
+        if (response?.success && Array.isArray(response.data)) {
+          setTenantRows(
+            response.data.map((item) =>
+              mapTenantRow(item as Record<string, unknown>),
+            ),
+          );
+          return;
+        }
+      } catch (error) {
+        console.error("Lỗi fetch tenant-createds:", error);
+      }
+
+      const fallbackRows = tenants.map((tenant) =>
+        mapTenantRow(tenant as unknown as Record<string, unknown>),
+      );
+      setTenantRows(fallbackRows);
+    };
+
+    loadTenantRows();
+  }, [tenants]);
+
   const rows = tenantId
-    ? tenants.filter((tenant) => tenant.id === tenantId)
-    : tenants;
+    ? tenantRows.filter((tenant) => tenant.tenantId === tenantId)
+    : tenantRows;
+
+  const handleRefresh = async () => {
+    try {
+      const response = await fetchTenantCreateds();
+      if (response?.success && Array.isArray(response.data)) {
+        setTenantRows(
+          response.data.map((item) =>
+            mapTenantRow(item as Record<string, unknown>),
+          ),
+        );
+      }
+    } catch (error) {
+      console.error("Lỗi refresh tenant-createds:", error);
+    }
+  };
 
   return (
     <Stack gap="xl">
@@ -193,7 +268,7 @@ export function Tenants({
         </Title>
         <Group gap="xs">
           <Tooltip label="Làm mới">
-            <ActionIcon variant="default" size="lg">
+            <ActionIcon variant="default" size="lg" onClick={handleRefresh}>
               <ArrowClockwiseIcon size={16} />
             </ActionIcon>
           </Tooltip>
@@ -214,11 +289,11 @@ export function Tenants({
           <Table.Thead>
             <Table.Tr>
               <Table.Th>ID</Table.Th>
-              <Table.Th>Tên</Table.Th>
+              <Table.Th>Tenant ID</Table.Th>
               <Table.Th>Trạng thái</Table.Th>
-              <Table.Th>Operators</Table.Th>
-              <Table.Th>Tài liệu</Table.Th>
-              <Table.Th>Min Stake</Table.Th>
+              <Table.Th>Admin</Table.Th>
+              <Table.Th>Manager</Table.Th>
+              <Table.Th>Treasury</Table.Th>
               <Table.Th>Ngày tạo</Table.Th>
               <Table.Th />
             </Table.Tr>
@@ -233,24 +308,44 @@ export function Tenants({
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm" fw={600} ff="monospace">
-                    {shortBytes32(t.id)}
+                    {shortBytes32(t.tenantId)}
                   </Text>
                 </Table.Td>
                 <Table.Td>
-                  <Badge
-                    color={STATUS_COLOR[t.isActive ? "ACTIVE" : "SUSPENDED"]}
-                    size="sm"
-                    variant="light"
-                  >
-                    {t.isActive ? "ACTIVE" : "SUSPENDED"}
-                  </Badge>
+                  {t.isActive === undefined ? (
+                    <Badge color="gray" size="sm" variant="light">
+                      UNKNOWN
+                    </Badge>
+                  ) : (
+                    <Badge
+                      color={t.isActive ? "teal" : "red"}
+                      size="sm"
+                      variant="light"
+                    >
+                      {t.isActive ? "ACTIVE" : "SUSPENDED"}
+                    </Badge>
+                  )}
                 </Table.Td>
-                <Table.Td>—</Table.Td>
-                <Table.Td>—</Table.Td>
-                <Table.Td>—</Table.Td>
+                <Table.Td>
+                  <Text size="xs" ff="monospace">
+                    {shortAddress(t.admin)}
+                  </Text>
+                </Table.Td>
+                <Table.Td>
+                  <Text size="xs" ff="monospace">
+                    {shortAddress(t.manager)}
+                  </Text>
+                </Table.Td>
+                <Table.Td>
+                  <Text size="xs" ff="monospace">
+                    {shortAddress(t.treasury)}
+                  </Text>
+                </Table.Td>
                 <Table.Td>
                   <Text size="xs" c="dimmed">
-                    {new Date(Number(t.createdAt) * 1000).toLocaleDateString()}
+                    {new Date(
+                      Number(t.blockTimestamp) * 1000,
+                    ).toLocaleDateString()}
                   </Text>
                 </Table.Td>
                 <Table.Td>

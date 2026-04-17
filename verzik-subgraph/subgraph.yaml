@@ -6,11 +6,11 @@ schema:
 dataSources:
   - kind: ethereum
     name: VoucherProtocol
-    network: hardhat
+    network: mainnet
     source:
-      address: "0xD8a5a9b31c3C0232E196d518E89Fd8bF83AcAd43"
+      address: "0xf4B146FbA71F41E0592668ffbF264F1D186b2Ca8"
       abi: VoucherProtocol
-      startBlock: 0
+      startBlock: 119
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -48,13 +48,11 @@ dataSources:
         - name: VoucherProtocol
           file: ./abis/VoucherProtocol.json
       eventHandlers:
-        - event: CoSignOperatorConfigured(indexed bytes32,indexed uint32,indexed
-            address,bool,uint16)
+        - event: CoSignOperatorConfigured(indexed bytes32,indexed uint32,indexed address,bool,uint16)
           handler: handleCoSignOperatorConfigured
         - event: CoSignPolicyUpdated(indexed bytes32,indexed uint32,bool,uint256,uint256,uint256)
           handler: handleCoSignPolicyUpdated
-        - event: DocumentAnchored(indexed bytes32,indexed bytes32,string,indexed
-            address,bytes32,bytes32,uint32,uint32)
+        - event: DocumentAnchored(indexed bytes32,indexed bytes32,string,indexed address,bytes32,bytes32,uint32,uint32)
           handler: handleDocumentAnchored
         - event: DocumentCoSignQualified(indexed bytes32,indexed bytes32,uint256,uint256)
           handler: handleDocumentCoSignQualified
@@ -72,16 +70,13 @@ dataSources:
           handler: handleOperatorMetadataUpdated
         - event: OperatorRecovered(indexed bytes32,indexed address,indexed address,uint256,string)
           handler: handleOperatorRecovered
-        - event:
-            OperatorRecoveryAliasUpdated(indexed bytes32,indexed address,indexed
-            address,address)
+        - event: OperatorRecoveryAliasUpdated(indexed bytes32,indexed address,indexed address,address)
           handler: handleOperatorRecoveryAliasUpdated
         - event: OperatorRecoveryDelegateUpdated(indexed bytes32,indexed address,indexed address)
           handler: handleOperatorRecoveryDelegateUpdated
         - event: OperatorSlashed(indexed bytes32,indexed address,uint256,indexed address,string)
           handler: handleOperatorSlashed
-        - event: OperatorSoftSlashed(indexed bytes32,indexed address,indexed
-            bytes32,uint16,uint256,uint256,address,string)
+        - event: OperatorSoftSlashed(indexed bytes32,indexed address,indexed bytes32,uint16,uint256,uint256,address,string)
           handler: handleOperatorSoftSlashed
         - event: OperatorStakeToppedUp(indexed bytes32,indexed address,uint256,uint256)
           handler: handleOperatorStakeToppedUp
@@ -99,7 +94,7 @@ dataSources:
           handler: handleRoleGranted
         - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
           handler: handleRoleRevoked
-        - event: TenantCreated(indexed bytes32,indexed address,indexed address)
+        - event: TenantCreated(indexed bytes32,indexed address,indexed address,address)
           handler: handleTenantCreated
         - event: TenantStatusUpdated(indexed bytes32,bool)
           handler: handleTenantStatusUpdated

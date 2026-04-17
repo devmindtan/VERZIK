@@ -54,11 +54,13 @@ import { CoSignPolicy } from "./pages/CoSignPolicy";
 import { SlashPanel } from "./pages/SlashPanel";
 import { Treasury } from "./pages/Treasury";
 import { TxExplorer } from "./pages/TxExplorer";
+// import { DocumentViewer } from "./pages/DocumentViewer";
 const NAV_ITEMS: { id: Page; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "Tổng quan", icon: <HouseIcon size={18} /> },
   { id: "tenants", label: "Tenants", icon: <BuildingsIcon size={18} /> },
   { id: "operators", label: "Operators", icon: <UsersThreeIcon size={18} /> },
   { id: "documents", label: "Tài liệu", icon: <FileTextIcon size={18} /> },
+  // { id: "doc-viewer", label: "Xem Tài Liệu", icon: <FileTextIcon size={18} /> },
   { id: "cosign", label: "CoSign Policy", icon: <SealCheckIcon size={18} /> },
   { id: "slash", label: "Xử phạt", icon: <LightningIcon size={18} /> },
   { id: "treasury", label: "Treasury", icon: <WalletIcon size={18} /> },
@@ -144,15 +146,7 @@ export function AppLayout() {
   };
 
   const pageMap: Record<Page, React.ReactNode> = {
-    dashboard: (
-      <Dashboard
-        session={effectiveSession}
-        tenants={tenants}
-        operators={operators}
-        balanceEth={balanceEth}
-        networkName={networkName}
-      />
-    ),
+    dashboard: <Dashboard session={effectiveSession} />,
     tenants: (
       <Tenants
         tenantId={effectiveSession.tenantId}
