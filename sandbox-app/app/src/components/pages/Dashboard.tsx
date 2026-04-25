@@ -4,7 +4,6 @@ import {
   Text,
   Group,
   Stack,
-  Badge,
   Table,
   Title,
   ThemeIcon,
@@ -31,6 +30,7 @@ import {
   fetchDocumentAnchoreds,
   fetchOperatorJoineds,
   fetchTenantCount,
+  fetchDocumentCoSignQualifieds,
 } from "../../services/blockchain.query.service";
 
 function StatCard({ label, value, icon, color, sub }: StatCardProps) {
@@ -58,17 +58,19 @@ function StatCard({ label, value, icon, color, sub }: StatCardProps) {
   );
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  ACTIVE: "teal",
-  REVOKED: "red",
-  PENDING: "yellow",
-};
+// const STATUS_COLOR: Record<string, string> = {
+//   ACTIVE: "teal",
+//   REVOKED: "red",
+//   PENDING: "yellow",
+// };
 
 export function Dashboard({ session }: { session: WalletSession }) {
   const [documentAnchoreds, setDocumentAnchoreds] =
     useState<DataResponseWithTotal | null>(null);
   const [tenantCount, setTenantCount] = useState(0);
   const [operatorJoineds, setOperatorJoineds] =
+    useState<DataResponseWithTotal | null>(null);
+  const [documentCoSignQualifieds, setDocumentCoSignQualifieds] =
     useState<DataResponseWithTotal | null>(null);
   useEffect(() => {
     const handleFetchDocumentAnchoreds = async () => {
@@ -102,9 +104,20 @@ export function Dashboard({ session }: { session: WalletSession }) {
       }
     };
 
+    const handleFetchDocumentCoSignQualifieds = async () => {
+      try {
+        const data = await fetchDocumentCoSignQualifieds();
+        const result = data?.data;
+        setDocumentCoSignQualifieds(result ?? null);
+      } catch (error) {
+        console.error("Lỗi fetch:", error);
+      }
+    };
+
     handleFetchDocumentAnchoreds();
     handleFetchTenantCount();
     handleFetchOperatorJoineds();
+    handleFetchDocumentCoSignQualifieds();
   }, []);
 
   const title =
@@ -142,7 +155,7 @@ export function Dashboard({ session }: { session: WalletSession }) {
         />
         <StatCard
           label="Tài liệu đủ tiêu chuẩn"
-          value={String(tenantCount || "-")}
+          value={String(documentCoSignQualifieds?.total || "-")}
           icon={<SealCheckIcon size={22} />}
           color="orange"
           sub="Đã đủ tiêu chuẩn"
@@ -161,8 +174,8 @@ export function Dashboard({ session }: { session: WalletSession }) {
                 <Table.Tr>
                   <Table.Th>Document ID</Table.Th>
                   <Table.Th>Tenant</Table.Th>
-                  <Table.Th>Status</Table.Th>
-                  <Table.Th>CoSign</Table.Th>
+                  <Table.Th>Loại tài liệu</Table.Th>
+                  <Table.Th>Phiên bản</Table.Th>
                   <Table.Th>Thời gian</Table.Th>
                 </Table.Tr>
               </Table.Thead>
@@ -177,19 +190,10 @@ export function Dashboard({ session }: { session: WalletSession }) {
                     <Table.Td>
                       {(doc.tenantId || doc.tenant).substring(0, 10)}...
                     </Table.Td>
-                    <Table.Td>
-                      <Badge
-                        color={STATUS_COLOR[doc.status] || "gray"}
-                        size="sm"
-                        variant="light"
-                      >
-                        {doc.status}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>{doc.cosigned || 0}/3</Table.Td>
+                    <Table.Td>{doc.docType}</Table.Td>
+                    <Table.Td>{doc.version || 0}</Table.Td>
                     <Table.Td>
                       <Text size="xs" c="dimmed">
-                        {/* Convert timestamp từ Graph (giây) sang ngày tháng */}
                         {new Date(
                           Number(doc.blockTimestamp) * 1000,
                         ).toLocaleString()}
@@ -198,7 +202,6 @@ export function Dashboard({ session }: { session: WalletSession }) {
                   </Table.Tr>
                 ))}
 
-                {/* Xử lý trường hợp mảng rỗng */}
                 {documentAnchoreds?.total === 0 && (
                   <Table.Tr>
                     <Table.Td colSpan={5} align="center" py="xl">

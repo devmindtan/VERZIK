@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import {
   Stack,
   Title,
@@ -26,21 +26,43 @@ import {
   PlusIcon,
 } from "@phosphor-icons/react";
 import { shortBytes32 } from "../../utils/display";
+import {
+  fetchPenaltyByTenantId,
+  fetchViolationPenaltyUpdateds,
+  fetchOperatorHardSlasheds,
+  fetchOperatorSoftSlasheds,
+} from "../../services/blockchain.query.service";
+import { DetailPanel } from "../customs/DetailSection";
+import { CopyableValue } from "../customs/InfoFields";
 
 interface ViolationPenalty {
-  tenant_id: string;
-  violation_type: string;
-  penalty_amount: string;
+  tenantId: string;
+  violationType: string;
+  penaltyAmount: string;
   is_hard: boolean;
 }
 
-interface SlashHistoryEntry {
+interface HardSlashEntry {
+  tenantId: string;
   operator: string;
-  tenant_id: string;
-  violation_type: string;
-  reason: string;
   amount: string;
-  timestamp: string;
+  slasher: string;
+  reason: string;
+  blockTimestamp: string;
+  transactionHash: string;
+}
+
+interface SoftSlashEntry {
+  tenantId: string;
+  operator: string;
+  violationCode: string;
+  penaltyBps: number;
+  slashedAmount: string;
+  remainingStake: string;
+  slasher: string;
+  reason: string;
+  blockTimestamp: string;
+  transactionHash: string;
 }
 
 function SlashModal({
@@ -148,10 +170,114 @@ export function SlashPanel({
   const [hardOpen, setHardOpen] = useState(false);
   const [softOpen, setSoftOpen] = useState(false);
   const [penaltyOpen, setPenaltyOpen] = useState(false);
-  const [penalties] = useState<ViolationPenalty[]>([]);
-  const historyRows: SlashHistoryEntry[] = [];
-  const [loading] = useState(false);
-  const [error] = useState<string | null>(null);
+  const [lookupTenantId, setLookupTenantId] = useState(tenantId ?? "");
+  const [penalties, setPenalties] = useState<ViolationPenalty[]>([]);
+  const [penaltyDetail, setPenaltyDetail] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [hardSlashRows, setHardSlashRows] = useState<HardSlashEntry[]>([]);
+  const [softSlashRows, setSoftSlashRows] = useState<SoftSlashEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadAll = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [penaltyRes, hardRes, softRes] = await Promise.all([
+          fetchViolationPenaltyUpdateds(),
+          fetchOperatorHardSlasheds(),
+          fetchOperatorSoftSlasheds(),
+        ]);
+
+        if (penaltyRes?.success && Array.isArray(penaltyRes.data)) {
+          setPenalties(
+            penaltyRes.data.map((item) => {
+              const row = item as Record<string, unknown>;
+              const penalty = Number(row.newPenaltyBps ?? 0);
+              return {
+                tenantId: String(row.tenantId ?? ""),
+                violationType: String(row.violationCode ?? "-"),
+                penaltyAmount: `${penalty} bps`,
+                is_hard: penalty >= 5000,
+              };
+            }),
+          );
+        }
+
+        if (hardRes?.success && Array.isArray(hardRes.data)) {
+          setHardSlashRows(
+            (hardRes.data as Record<string, unknown>[]).map((item) => ({
+              tenantId: String(item.tenantId ?? ""),
+              operator: String(item.operator ?? ""),
+              amount: String(item.amount ?? "0"),
+              slasher: String(item.slasher ?? ""),
+              reason: String(item.reason ?? ""),
+              blockTimestamp: new Date(
+                Number(item.blockTimestamp ?? 0) * 1000,
+              ).toLocaleString(),
+              transactionHash: String(item.transactionHash ?? ""),
+            })),
+          );
+        }
+
+        if (softRes?.success && Array.isArray(softRes.data)) {
+          setSoftSlashRows(
+            (softRes.data as Record<string, unknown>[]).map((item) => ({
+              tenantId: String(item.tenantId ?? ""),
+              operator: String(item.operator ?? ""),
+              violationCode: String(item.violationCode ?? "-"),
+              penaltyBps: Number(item.penaltyBps ?? 0),
+              slashedAmount: String(item.slashedAmount ?? "0"),
+              remainingStake: String(item.remainingStake ?? "0"),
+              slasher: String(item.slasher ?? ""),
+              reason: String(item.reason ?? ""),
+              blockTimestamp: new Date(
+                Number(item.blockTimestamp ?? 0) * 1000,
+              ).toLocaleString(),
+              transactionHash: String(item.transactionHash ?? ""),
+            })),
+          );
+        }
+      } catch (fetchError) {
+        console.error("Lỗi fetch slash data:", fetchError);
+        setError("Không tải được dữ liệu.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAll();
+  }, []);
+
+  const handleGetPenaltyDetail = async () => {
+    const resolvedTenantId = lookupTenantId.trim();
+    if (!resolvedTenantId) {
+      setError("Vui lòng nhập tenantId để xem chi tiết penalty.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetchPenaltyByTenantId(resolvedTenantId);
+      if (!response?.success) {
+        setPenaltyDetail(null);
+        setError("Không lấy được penalty detail theo tenantId.");
+        return;
+      }
+
+      setPenaltyDetail(response.data);
+    } catch (fetchError) {
+      console.error("Lỗi fetch penalty detail:", fetchError);
+      setPenaltyDetail(null);
+      setError("Không lấy được penalty detail theo tenantId.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Stack gap="xl">
@@ -189,6 +315,22 @@ export function SlashPanel({
         </Group>
       </Group>
 
+      <Card withBorder radius="md" padding="md">
+        <Group align="flex-end">
+          <TextInput
+            label="Tenant ID (chi tiết penalty)"
+            placeholder="0x..."
+            ff="monospace"
+            value={lookupTenantId}
+            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+              setLookupTenantId(event.currentTarget.value)
+            }
+            style={{ flex: 1 }}
+          />
+          <Button onClick={handleGetPenaltyDetail}>Xem chi tiết penalty</Button>
+        </Group>
+      </Card>
+
       <Tabs defaultValue="history">
         <Tabs.List mb="md">
           <Tabs.Tab value="history">Lịch sử xử phạt</Tabs.Tab>
@@ -196,36 +338,134 @@ export function SlashPanel({
         </Tabs.List>
 
         <Tabs.Panel value="history">
-          <Card withBorder radius="md" padding={0}>
-            <Table highlightOnHover verticalSpacing="sm">
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Operator</Table.Th>
-                  <Table.Th>Tenant</Table.Th>
-                  <Table.Th>Loại</Table.Th>
-                  <Table.Th>Lý do</Table.Th>
-                  <Table.Th>Số tiền</Table.Th>
-                  <Table.Th>Thời gian</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {historyRows.map((row) => (
-                  <Table.Tr key={`${row.operator}-${row.timestamp}`}>
-                    <Table.Td>{row.operator}</Table.Td>
-                    <Table.Td>#{shortBytes32(row.tenant_id)}</Table.Td>
-                    <Table.Td>
-                      <Badge size="sm" variant="outline">
-                        {row.violation_type}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>{row.reason}</Table.Td>
-                    <Table.Td>{row.amount}</Table.Td>
-                    <Table.Td>{row.timestamp}</Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </Card>
+          <Tabs defaultValue="hard">
+            <Tabs.List mb="sm">
+              <Tabs.Tab value="hard">
+                Hard Slash{" "}
+                <Badge size="xs" color="red" variant="light" ml={4}>
+                  {hardSlashRows.length}
+                </Badge>
+              </Tabs.Tab>
+              <Tabs.Tab value="soft">
+                Soft Slash{" "}
+                <Badge size="xs" color="orange" variant="light" ml={4}>
+                  {softSlashRows.length}
+                </Badge>
+              </Tabs.Tab>
+            </Tabs.List>
+
+            <Tabs.Panel value="hard">
+              <Card withBorder radius="md" padding={0}>
+                <Table highlightOnHover verticalSpacing="sm">
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Operator</Table.Th>
+                      <Table.Th>Tenant</Table.Th>
+                      <Table.Th>Số tiền</Table.Th>
+                      <Table.Th>Slasher</Table.Th>
+                      <Table.Th>Lý do</Table.Th>
+                      <Table.Th>Thời gian</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {hardSlashRows.length === 0 ? (
+                      <Table.Tr>
+                        <Table.Td colSpan={6}>
+                          <Text ta="center" c="dimmed" py="md">
+                            Chưa có hard slash nào.
+                          </Text>
+                        </Table.Td>
+                      </Table.Tr>
+                    ) : null}
+                    {hardSlashRows.map((row, i) => (
+                      <Table.Tr key={i}>
+                        <Table.Td>
+                          <CopyableValue value={row.operator} mono />
+                        </Table.Td>
+                        <Table.Td>
+                          <CopyableValue value={row.tenantId} mono />
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" fw={600} c="red">
+                            {row.amount}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <CopyableValue value={row.slasher} mono />
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" lineClamp={1}>
+                            {row.reason || "-"}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="xs" c="dimmed">
+                            {row.blockTimestamp}
+                          </Text>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Card>
+            </Tabs.Panel>
+
+            <Tabs.Panel value="soft">
+              <Card withBorder radius="md" padding={0}>
+                <Table highlightOnHover verticalSpacing="sm">
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Operator</Table.Th>
+                      <Table.Th>Tenant</Table.Th>
+                      <Table.Th>Loại vi phạm</Table.Th>
+                      <Table.Th>Penalty (bps)</Table.Th>
+                      <Table.Th>Stake còn lại</Table.Th>
+                      <Table.Th>Thời gian</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {softSlashRows.length === 0 ? (
+                      <Table.Tr>
+                        <Table.Td colSpan={6}>
+                          <Text ta="center" c="dimmed" py="md">
+                            Chưa có soft slash nào.
+                          </Text>
+                        </Table.Td>
+                      </Table.Tr>
+                    ) : null}
+                    {softSlashRows.map((row, i) => (
+                      <Table.Tr key={i}>
+                        <Table.Td>
+                          <CopyableValue value={row.operator} mono />
+                        </Table.Td>
+                        <Table.Td>
+                          <CopyableValue value={row.tenantId} mono />
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge size="sm" color="orange" variant="outline">
+                            {row.violationCode}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" fw={600}>
+                            {row.penaltyBps} bps
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">{row.remainingStake}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="xs" c="dimmed">
+                            {row.blockTimestamp}
+                          </Text>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Card>
+            </Tabs.Panel>
+          </Tabs>
         </Tabs.Panel>
 
         <Tabs.Panel value="penalties">
@@ -269,15 +509,17 @@ export function SlashPanel({
                 ) : null}
                 {penalties.map((p, i) => (
                   <Table.Tr key={i}>
-                    <Table.Td>#{shortBytes32(p.tenant_id)}</Table.Td>
+                    <Table.Td>
+                      <CopyableValue value={p.tenantId} mono />
+                    </Table.Td>
                     <Table.Td>
                       <Badge size="sm" variant="outline">
-                        {p.violation_type}
+                        {p.violationType}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm" fw={600}>
-                        {p.penalty_amount}
+                        {p.penaltyAmount}
                       </Text>
                     </Table.Td>
                     <Table.Td>
@@ -294,6 +536,20 @@ export function SlashPanel({
               </Table.Tbody>
             </Table>
           </Card>
+
+          {penaltyDetail ? (
+            <Card withBorder radius="md" padding="md" mt="sm">
+              <Text fw={600} mb="sm">
+                Penalty Detail
+              </Text>
+              <DetailPanel
+                data={penaltyDetail}
+                tabLabels={{
+                  violationPenaltyUpdateds: "Cập nhật Penalty",
+                }}
+              />
+            </Card>
+          ) : null}
         </Tabs.Panel>
       </Tabs>
 

@@ -10,7 +10,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "shamirs-secret-sharing": "^2.0.1"
+    "shamirs-secret-sharing": "^2.0.1",
+    "ethers": "^6.16.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.2",

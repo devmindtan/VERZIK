@@ -100,8 +100,6 @@ export interface ViolationPenaltyUpdatedRow {
 
 export interface AccountSnapshot {
   session: WalletSession;
-  tenants: TenantInfo[];
-  operators: OperatorStatus[];
   balanceEth: string;
   networkName: string;
 }

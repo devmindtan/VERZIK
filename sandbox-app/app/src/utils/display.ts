@@ -10,7 +10,7 @@ export function shortValue(
   if (value.length <= head + tail + 3) return value;
   return `${value.slice(0, head)}...${value.slice(-tail)}`;
 }
-
+// Hiển thị 8 ký tự đầu và 6 ký tự cuối (Mặc định thường là 0x1234...abcd)
 export function shortAddress(value: string | undefined | null): string {
   return shortValue(value, 6, 4);
 }

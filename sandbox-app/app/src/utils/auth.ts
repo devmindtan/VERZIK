@@ -5,6 +5,12 @@ import {
   checkPermission,
   type PermissionRole,
 } from "../services/blockchain.permission.service";
+const RPC_URL = import.meta.env.VITE_RPC_URL as string | undefined;
+const PROTOCOL_ADDRESS = import.meta.env.VITE_PROTOCOL_ADDRESS as
+  | string
+  | undefined;
+
+const provider = new JsonRpcProvider(RPC_URL);
 
 function buildSessionFromPermission(
   address: string,
@@ -68,9 +74,6 @@ export async function loadAccountSnapshot(
   const sanitized = privateKey.trim();
   const normalized = sanitized.startsWith("0x") ? sanitized : `0x${sanitized}`;
 
-  const RPC_URL = "https://hardhat.devmindtan.uk";
-  const provider = new JsonRpcProvider(RPC_URL);
-
   let wallet: Wallet;
   try {
     wallet = new Wallet(normalized, provider);
@@ -99,9 +102,15 @@ export async function loadAccountSnapshot(
 
   return {
     session,
-    tenants: [],
-    operators: [],
     balanceEth: formatEther(balanceWei),
     networkName: displayNetworkName,
   };
+}
+export async function getStake(): Promise<number> {
+  const balance = await provider.getBalance(PROTOCOL_ADDRESS ?? "");
+  return Number(formatEther(balance));
+}
+export async function getSlash(treasuryAddress: string): Promise<number> {
+  const balance = await provider.getBalance(treasuryAddress);
+  return Number(formatEther(balance)) || 0;
 }

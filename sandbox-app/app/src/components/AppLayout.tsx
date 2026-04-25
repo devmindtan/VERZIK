@@ -17,10 +17,9 @@ import {
   Stack,
   Text,
   TextInput,
-  Center,
+  Title,
 } from "@mantine/core";
 import {
-  ArrowsClockwiseIcon,
   BuildingsIcon,
   FileTextIcon,
   GearIcon,
@@ -45,7 +44,7 @@ import {
 } from "./access";
 import type { OperatorStatus, TenantInfo } from "../utils/types";
 import { loadAccountSnapshot } from "../utils/auth";
-import { shortAddress, shortBytes32 } from "../utils/display";
+import { shortBytes32 } from "../utils/display";
 import { Dashboard } from "./pages/Dashboard";
 import { Tenants } from "./pages/Tenants";
 import { Operators } from "./pages/Operators";
@@ -54,6 +53,12 @@ import { CoSignPolicy } from "./pages/CoSignPolicy";
 import { SlashPanel } from "./pages/SlashPanel";
 import { Treasury } from "./pages/Treasury";
 import { TxExplorer } from "./pages/TxExplorer";
+import { Settings } from "./pages/Settings";
+import { getStake } from "../utils/auth";
+
+const PROTOCOL_ADDRESS = import.meta.env.VITE_PROTOCOL_ADDRESS as
+  | string
+  | undefined;
 // import { DocumentViewer } from "./pages/DocumentViewer";
 const NAV_ITEMS: { id: Page; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "Tổng quan", icon: <HouseIcon size={18} /> },
@@ -71,6 +76,7 @@ export function AppLayout() {
   const [opened, setOpened] = useState(false);
   const [loginOpened, setLoginOpened] = useState(false);
   const [privateKey, setPrivateKey] = useState("");
+  const [settingsOpened, setSettingsOpened] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -80,6 +86,7 @@ export function AppLayout() {
   const [balanceEth, setBalanceEth] = useState("-");
   const [networkName, setNetworkName] = useState("-");
   const [activePage, setActivePage] = useState<Page>("dashboard");
+  const [stake, setStake] = useState(0);
 
   const effectiveSession = useMemo<WalletSession>(
     () =>
@@ -106,6 +113,11 @@ export function AppLayout() {
     if (!visiblePages.includes(activePage)) {
       setActivePage(visiblePages[0] ?? "dashboard");
     }
+    const handleGetStake = async () => {
+      const stake = await getStake();
+      setStake(stake);
+    };
+    handleGetStake();
   }, [activePage, visiblePages]);
 
   const handleConnectByPrivateKey = async () => {
@@ -120,8 +132,6 @@ export function AppLayout() {
 
       const snapshot = await loadAccountSnapshot(sanitized);
       setSession(snapshot.session);
-      setTenants(snapshot.tenants);
-      setOperators(snapshot.operators);
       setBalanceEth(snapshot.balanceEth);
       setNetworkName(snapshot.networkName);
 
@@ -192,77 +202,15 @@ export function AppLayout() {
         tenantId={effectiveSession.tenantId}
         tenants={tenants}
         operators={operators}
+        stake={stake}
       />
     ),
     tx: <TxExplorer tenantId={effectiveSession.tenantId} />,
   };
 
-  if (!session) {
-    return (
-      <Box p="xl" mih="100vh">
-        <Center mih="90vh">
-          <Paper withBorder radius="md" p="xl" maw={560} w="100%">
-            <Stack gap="md">
-              <Group gap="sm">
-                <KeyIcon size={20} />
-                <Text fw={700} size="lg">
-                  Đăng nhập hệ thống
-                </Text>
-              </Group>
-              <Text size="sm" c="dimmed">
-                Nhập private key thực tế để đăng nhập. Dữ liệu nghiệp vụ sẽ lấy
-                từ API khi bạn tích hợp ở bước tiếp theo.
-              </Text>
-              <Button
-                leftSection={<KeyIcon size={14} />}
-                onClick={() => setLoginOpened(true)}
-              >
-                Đăng nhập bằng Private Key
-              </Button>
-            </Stack>
-          </Paper>
-        </Center>
-
-        <Modal
-          opened={loginOpened}
-          onClose={() => setLoginOpened(false)}
-          title="Đăng nhập bằng Private Key"
-          size="md"
-        >
-          <Stack gap="md">
-            <TextInput
-              label="Private Key"
-              placeholder="0x..."
-              value={privateKey}
-              onChange={(event) => setPrivateKey(event.currentTarget.value)}
-              ff="monospace"
-            />
-            {loginError ? (
-              <Text size="sm" c="red">
-                {loginError}
-              </Text>
-            ) : null}
-            <Group justify="flex-end">
-              <Button variant="default" onClick={() => setLoginOpened(false)}>
-                Hủy
-              </Button>
-              <Button
-                onClick={handleConnectByPrivateKey}
-                loading={loginLoading}
-              >
-                Đăng nhập
-              </Button>
-            </Group>
-          </Stack>
-        </Modal>
-      </Box>
-    );
-  }
-
-  // const filteredNavItems = NAV_ITEMS.filter((item) =>
-  //   visiblePages.includes(item.id),
-  // );
-  const filteredNavItems = NAV_ITEMS;
+  const filteredNavItems = NAV_ITEMS.filter((item) =>
+    visiblePages.includes(item.id),
+  );
 
   return (
     <AppShell
@@ -280,7 +228,11 @@ export function AppLayout() {
               size="sm"
             />
             <Group gap={8}>
-              <ArrowsClockwiseIcon size={22} weight="bold" />
+              <img
+                src="/verzik.svg"
+                alt="Voucher Protocol Logo"
+                style={{ width: 22, height: 22 }}
+              />
               <Text fw={700} size="md">
                 VoucherProtocol
               </Text>
@@ -288,14 +240,24 @@ export function AppLayout() {
           </Group>
 
           <Group gap="sm">
-            <ActionIcon
-              variant="light"
-              color="red"
-              size="lg"
-              onClick={handleDisconnect}
-            >
-              <SignOutIcon size={16} />
-            </ActionIcon>
+            {session ? (
+              <ActionIcon
+                variant="light"
+                color="red"
+                size="lg"
+                onClick={handleDisconnect}
+              >
+                <SignOutIcon size={16} />
+              </ActionIcon>
+            ) : (
+              <Button
+                size="xs"
+                leftSection={<KeyIcon size={14} />}
+                onClick={() => setLoginOpened(true)}
+              >
+                Đăng nhập
+              </Button>
+            )}
             <Badge variant="dot" color="teal" size="sm">
               Localnet
             </Badge>
@@ -336,6 +298,7 @@ export function AppLayout() {
         <NavLink
           label="Cài đặt"
           leftSection={<GearIcon size={18} />}
+          onClick={() => setSettingsOpened(true)}
           styles={{ root: { borderRadius: 6 } }}
         />
       </AppShell.Navbar>
@@ -348,15 +311,23 @@ export function AppLayout() {
                 <PlugIcon size={18} />
                 <Text fw={700}>Tài khoản kết nối</Text>
               </Group>
-              <Badge variant="outline">Connected</Badge>
+              <Badge variant="outline">{session ? "Connected" : "Guest"}</Badge>
             </Group>
             <Stack gap={6} mt="sm">
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">
+                  Địa chỉ protocol
+                </Text>
+                <Text size="sm" ff="monospace">
+                  {PROTOCOL_ADDRESS}
+                </Text>
+              </Group>
               <Group justify="space-between">
                 <Text size="sm" c="dimmed">
                   Địa chỉ ví
                 </Text>
                 <Text size="sm" ff="monospace">
-                  {shortAddress(effectiveSession.address)}
+                  {effectiveSession.address}
                 </Text>
               </Group>
               <Group justify="space-between">
@@ -406,16 +377,61 @@ export function AppLayout() {
               color="gray"
               variant="light"
               icon={<WarningCircleIcon size={18} />}
-              title="Ví không có quyền quản trị"
+              title="Guest / Read-only"
+              mb="md"
             >
-              Ví này không thuộc owner, tenant hay operator. Chỉ có thể xem
-              thông tin tài khoản.
+              Bạn đang ở chế độ xem, tra cứu và xác thực. Các chức năng set/cập
+              nhật đã bị khóa.
             </Alert>
-          ) : (
-            pageMap[activePage]
-          )}
+          ) : null}
+
+          {pageMap[activePage]}
         </Box>
       </AppShell.Main>
+
+      <Modal
+        opened={loginOpened}
+        onClose={() => setLoginOpened(false)}
+        title="Đăng nhập bằng Private Key"
+        size="md"
+      >
+        <Stack gap="md">
+          <TextInput
+            label="Private Key"
+            placeholder="0x..."
+            value={privateKey}
+            onChange={(event) => setPrivateKey(event.currentTarget.value)}
+            ff="monospace"
+          />
+          {loginError ? (
+            <Text size="sm" c="red">
+              {loginError}
+            </Text>
+          ) : null}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setLoginOpened(false)}>
+              Hủy
+            </Button>
+            <Button onClick={handleConnectByPrivateKey} loading={loginLoading}>
+              Đăng nhập
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={settingsOpened}
+        onClose={() => setSettingsOpened(false)}
+        title={<Title order={3}>Cài đặt</Title>}
+        size="xl"
+      >
+        <Settings
+          session={effectiveSession}
+          capabilities={capabilities}
+          networkName={networkName}
+          balanceEth={balanceEth}
+        />
+      </Modal>
     </AppShell>
   );
 }

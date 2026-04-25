@@ -14,16 +14,18 @@ Dự án tuân thủ tiêu chuẩn [Semantic Versioning](https://semver.org/).
   - [\[Unreleased\]](#unreleased)
     - [Changed](#changed)
     - [Added](#added)
+  - [\[1.0.3-alpha\] - 2026-04-25](#103-alpha---2026-04-25)
+    - [Added](#added-1)
   - [\[1.0.2-alpha\] - 2026-04-12](#102-alpha---2026-04-12)
     - [Changed](#changed-1)
-    - [Added](#added-1)
+    - [Added](#added-2)
   - [\[1.0.1-alpha\] - 2026-04-12](#101-alpha---2026-04-12)
     - [Security](#security)
     - [Changed](#changed-2)
-    - [Added](#added-2)
+    - [Added](#added-3)
   - [\[1.0.0-alpha\] - 2026-04-09](#100-alpha---2026-04-09)
     - [Changed](#changed-3)
-    - [Added](#added-3)
+    - [Added](#added-4)
 
 ---
 
@@ -59,23 +61,25 @@ Dự án tuân thủ tiêu chuẩn [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **Dự kiến tích hợp The Graph để index và truy vấn dữ liệu on-chain:**
-  - Thay thế hoặc bổ sung bên cạnh `VoucherProtocolReader` cho các truy vấn phức tạp (lịch sử, thống kê, lọc nhiều điều kiện).
-  - Subgraph sẽ lắng nghe các event chính: `TenantCreated`, `OperatorJoined`, `DocumentRegistered`, `DocumentCoSigned`, `OperatorSlashed`, `OperatorRecovered`.
-  - Cho phép backend truy vấn qua GraphQL thay vì gọi RPC trực tiếp, giảm tải node và tăng hiệu năng đọc.
-
-- **Bổ sung backlog mở rộng Reader contract phục vụ debug và vận hành:**
-  - Có thể thêm các API truy vấn phục vụ kiểm tra role, recovery chain và trạng thái governance theo tenant.
-  - Các API reader mở rộng sẽ hữu ích cho CLI, dashboard quản trị và kiểm thử tích hợp.
-
 - **Bổ sung kế hoạch tăng độ phủ kiểm thử cho các rule phân tách quyền:**
   - Cần thêm test cho toàn bộ các trường hợp Protocol Admin không được trở thành tenant hoặc operator theo mọi đường đi trực tiếp và gián tiếp.
   - Bao gồm các case qua create tenant, update treasury, recovery delegate, recovery by admin, operator onboarding, ký tài liệu và co-sign.
 
-- **Bổ sung khả năng truy vết giao dịch trong bộ công cụ test sandbox:**
-  - Cho phép xem nhanh thông tin transaction lifecycle và event decode ngay từ CLI mà không cần mở explorer ngoài.
-
 ---
+
+## [1.0.3-alpha] - 2026-04-25
+
+### Added
+
+- **Đã tích hợp The Graph để index và truy vấn dữ liệu on-chain:**
+  - Thay thế hoặc bổ sung bên cạnh `VoucherProtocolReader` cho các truy vấn phức tạp (lịch sử, thống kê, lọc nhiều điều kiện).
+  - Subgraph sẽ lắng nghe các event chính: `TenantCreated`, `OperatorJoined`, `DocumentRegistered`, `DocumentCoSigned`, `OperatorSlashed`, `OperatorRecovered`,...
+  - Cho phép backend truy vấn qua GraphQL thay vì gọi RPC trực tiếp, giảm tải node và tăng hiệu năng đọc.
+
+- **Đã mở rộng `VoucherProtocolReader` trong `blockchain-local` phục vụ debug và vận hành:**
+  - Bổ sung các API truy vấn `getCoSignOperatorConfig()`, `getTenantRuntimeConfig()`, `getViolationPenalty()` và `getRecoveryAliasStatus()`.
+  - `getTenantInfo()`, `getOperatorStatus()` và `getDocumentStatus()` đã trả đủ current-state để CLI, dashboard quản trị và luồng kiểm tra recovery/governance theo tenant sử dụng trực tiếp.
+  - Các hàm phân trang `getTenantIds()` và `getOperatorIds()` giữ hành vi an toàn khi `limit = 0` hoặc `offset` vượt phạm vi.
 
 ## [1.0.2-alpha] - 2026-04-12
 

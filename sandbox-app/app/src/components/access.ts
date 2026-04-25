@@ -104,12 +104,23 @@ export function resolveSessionByAddress(address: string): WalletSession {
 export function getRoleLabel(session: WalletSession) {
   if (session.primaryRole === "owner") return "Owner";
   if (session.primaryRole === "operator") return "Operator";
-  if (session.primaryRole === "guest") return "No Access";
+  if (session.primaryRole === "guest") return "Read Only";
   return `Tenant ${session.tenantRole ?? "member"}`;
 }
 
 export function getVisiblePages(session: WalletSession): Page[] {
-  if (session.primaryRole === "guest") return ["dashboard"];
+  if (session.primaryRole === "guest") {
+    return [
+      "dashboard",
+      "tenants",
+      "operators",
+      "documents",
+      "cosign",
+      "slash",
+      "treasury",
+      "tx",
+    ];
+  }
   return [
     "dashboard",
     "tenants",
@@ -223,7 +234,7 @@ export function getCapabilities(session: WalletSession): RoleCapabilities {
     canManageOperators: false,
     canManageStake: false,
     canRegisterDocument: false,
-    canVerifyDocument: false,
+    canVerifyDocument: true,
     canCoSignDocument: false,
     canRevokeDocument: false,
     canEditCoSignPolicy: false,
@@ -253,5 +264,5 @@ export function getScopeDescription(session: WalletSession) {
     }
   }
 
-  return "Ví này không thuộc owner / tenant / operator nên không có giao diện quản trị.";
+  return "Ví này ở chế độ read-only: được xem, tra cứu, xác thực; không có quyền set/cập nhật.";
 }

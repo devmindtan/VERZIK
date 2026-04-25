@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
 
-const BASE = import.meta.env.VITE_BACKEND_URL;
+const RAW_BASE = import.meta.env.VITE_BACKEND_URL as string | undefined;
+const BASE = (RAW_BASE ?? "").replace(/\/$/, "");
 
 export type PermissionRole =
   | "PROTOCOL_OWNER"

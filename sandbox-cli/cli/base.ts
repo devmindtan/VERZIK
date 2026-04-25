@@ -232,7 +232,7 @@ export abstract class BaseTestCLI {
   protected async handleGetNonce() {
     const tenantId = await this.rl.question("🔹 Nhập Tenant ID (bytes32): ");
     const operator = await this.rl.question("🔹 Nhập địa chỉ Operator: ");
-    const nonce = await this.client.getNonce(tenantId, operator);
+    const nonce = await this.client.getNonceCount(tenantId, operator);
     console.log(`\n  Nonce hiện tại: ${nonce}`);
   }
 
@@ -294,13 +294,7 @@ export abstract class BaseTestCLI {
       "🔹 Nhập Transaction Hash (bytes32): ",
     );
     const history = await this.client.getTransactionByHash(txHash);
-    console.log(
-      JSON.stringify(
-        history,
-        (key, value) => (typeof value === "bigint" ? value.toString() : value),
-        2,
-      ),
-    );
+    console.log(history);
   }
 
   // ─────────────────────────────────────────────

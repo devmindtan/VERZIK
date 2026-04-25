@@ -1,5 +1,4 @@
-import type { DocumentAnchored } from "@verzik/sdk";
-export interface DocumentAnchoredResponse {
-  data: DocumentAnchored[];
+export interface DataResponseWithTotal {
+  data: Record<string, any>[];
   total: number;
 }

@@ -6,7 +6,7 @@ schema:
 dataSources:
   - kind: ethereum
     name: VoucherProtocol
-    network: mainnet
+    network: hardhat
     source:
       address: "0x4631BCAbD6dF18D94796344963cB60d44a4136b6"
       abi: VoucherProtocol

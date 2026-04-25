@@ -127,6 +127,7 @@ export class OperatorCLI extends BaseTestCLI {
 
     const tenantId = await this.rl.question("🔹 Nhập Tenant ID (bytes32): ");
     const fileHash = await this.rl.question("🔹 File Hash (bytes32): ");
+    const owner = await this.rl.question("🔹 Nhập địa chỉ owner: ");
     const cid = await this.rl.question("🔹 IPFS CID: ");
     const ciphertextHash = await this.rl.question(
       "🔹 Ciphertext Hash (bytes32): ",
@@ -137,12 +138,16 @@ export class OperatorCLI extends BaseTestCLI {
     const docType = await this.rl.question("🔹 Doc Type (số): ");
     const version = await this.rl.question("🔹 Version (số): ");
 
-    const currentNonce = await this.client.getNonce(tenantId, signerAddress);
+    const currentNonce = await this.client.getNonceCount(
+      tenantId,
+      signerAddress,
+    );
     console.log(`=> Nonce hiện tại: ${currentNonce}`);
 
     const payload = createRegisterPayload({
       tenantId,
       fileHash,
+      owner,
       cid,
       ciphertextHash,
       encryptionMetaHash,
@@ -165,7 +170,10 @@ export class OperatorCLI extends BaseTestCLI {
     const tenantId = await this.rl.question("🔹 Nhập Tenant ID (bytes32): ");
     const fileHash = await this.rl.question("🔹 File Hash (bytes32): ");
 
-    const currentNonce = await this.client.getNonce(tenantId, signerAddress);
+    const currentNonce = await this.client.getNonceCount(
+      tenantId,
+      signerAddress,
+    );
     console.log(`=> Nonce hiện tại: ${currentNonce}`);
 
     // Lấy docType từ document để tạo payload
@@ -179,6 +187,7 @@ export class OperatorCLI extends BaseTestCLI {
     const payload = createRegisterPayload({
       tenantId,
       fileHash,
+      owner: doc.owner,
       cid: doc.cid,
       ciphertextHash: doc.ciphertextHash as unknown as string,
       encryptionMetaHash: doc.encryptionMetaHash as unknown as string,
